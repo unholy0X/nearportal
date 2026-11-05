@@ -16,7 +16,8 @@
     "typecheck": "tsc --noEmit",
     "sandbox:upgrade": "ENV_FILE=.env.sandbox node --import tsx scripts/sandbox-upgrade.ts",
     "portal:start": "node --import tsx server/tasks.ts",
-    "treasury:setup": "ENV_FILE=.env.sandbox node --import tsx scripts/treasury-setup.ts"
+    "treasury:setup": "ENV_FILE=.env.sandbox node --import tsx scripts/treasury-setup.ts",
+    "mcp": "node mcp/nearportal-mcp.mjs"
   },
   "license": "MIT",
   "description": "NearPortal server: GitHub pull-request bounties paid from escrow on NEAR testnet.",
@@ -41,5 +42,8 @@
     "vite": "^6.4.5"
   },
   "private": true,
-  "type": "module"
+  "type": "module",
+  "bin": {
+    "nearportal-mcp": "mcp/nearportal-mcp.mjs"
+  }
 }
