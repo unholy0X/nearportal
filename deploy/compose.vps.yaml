@@ -1,0 +1,41 @@
+# Isolated app behind an EXISTING reverse proxy. No proxy service or public 80/443 binding.
+# Use a new project/volume/loopback port for the redesigned contract deployment.
+services:
+  nearportal:
+    build:
+      context: ..
+      dockerfile: apps/server/Dockerfile
+    image: ${NEARPORTAL_IMAGE:?Set the source-tagged image name}
+    restart: unless-stopped
+    init: true
+    env_file: ${NEARPORTAL_ENV_FILE:?Set the private environment file}
+    environment:
+      NODE_ENV: production
+      NEARPORTAL_HOSTED: "1"
+      HOST: 0.0.0.0
+      PORT: "8787"
+      DATA_DIR: /var/lib/nearportal
+      SITE_DIR: /workspace/landing
+      NEAR_CREDENTIALS_DIR: /run/nearportal-keys
+      PORTAL_LOCAL_PREVIEW: "0"
+      GITHUB_USE_CLI: "0"
+      NEAR_NETWORK: testnet
+      MONERIUM_CHAIN: basesepolia
+      TASK_BANK_ENABLED: "0"
+    ports:
+      - "127.0.0.1:${NEARPORTAL_PORT:-3211}:8787"
+    volumes:
+      - data:/var/lib/nearportal
+      - ${NEARPORTAL_KEYS_PATH:?Mount only creator, verifier and relayer keys}:/run/nearportal-keys:ro
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    mem_limit: 768m
+    cpus: 1.0
+    pids_limit: 128
+    stop_grace_period: 45s
+volumes:
+  data:

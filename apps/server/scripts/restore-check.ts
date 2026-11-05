@@ -76,12 +76,13 @@ export function restoreCheck(options: { backup: string; target: string; key: Buf
     }
     // Every task with a payment in flight must still be represented after restore.
     const inflight = (db.prepare("SELECT COUNT(*) AS n FROM tasks WHERE json_extract(body,'$.payment.state') NOT IN ('NotRequested','Processed')").get() as { n: number }).n;
+    const refundsInFlight = (db.prepare("SELECT COUNT(*) AS n FROM tasks WHERE json_extract(body,'$.refund.state') NOT IN ('NotRequested','Processed')").get() as { n: number }).n;
     const journals = manifest.files.filter((f) => f.name.endsWith(".json")).map((f) => {
       const state = JSON.parse(readFileSync(join(target, f.name), "utf8"));
-      if (!state.jobs || !Array.isArray(state.reportedOrders) || !state.submitted) throw new Error(`Malformed relayer journal: ${f.name}`);
-      return { name: f.name, jobs: Object.keys(state.jobs).length, pendingSubmissions: Object.keys(state.pendingSubmissions ?? {}).length };
+      if (!state.bounties || !Array.isArray(state.reportedOrders) || !state.submitted) throw new Error(`Malformed relayer journal: ${f.name}`);
+      return { name: f.name, bounties: Object.keys(state.bounties).length, pendingSubmissions: Object.keys(state.pendingSubmissions ?? {}).length };
     });
-    return { ok: true, target, counts, usersDecrypted: users, encryptedRecords, paymentsInFlight: inflight, journals };
+    return { ok: true, target, counts, usersDecrypted: users, encryptedRecords, paymentsInFlight: inflight, refundsInFlight, journals };
   } finally { db.close(); }
 }
 

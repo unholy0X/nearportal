@@ -1,56 +1,41 @@
-// READ-ONLY preflight for the fixed-deadline testnet scenarios. It never signs or sends a
-// transaction and moves no funds. It reports, per rail:
-// - deployed code hash, and whether it is in MARKET_VERIFIED_CODE_HASHES;
-// - whether the deadline methods exist (absence = the extended contract is not deployed);
-// - the verifier account's function-call key scopes (new methods must be explicitly allowed).
-// Usage: ENV_FILE=.env.sandbox node --import tsx scripts/e2e/testnet-preflight.ts
-import { readFileSync, existsSync } from "node:fs";
-
-const file = process.env.ENV_FILE ?? ".env.sandbox";
-const env: Record<string, string> = { ...process.env } as Record<string, string>;
-if (existsSync(file)) for (const line of readFileSync(file, "utf8").split("\n")) {
-  const i = line.indexOf("=");
-  if (i > 0 && !line.startsWith("#")) env[line.slice(0, i).trim()] ??= line.slice(i + 1).trim();
+// Read-only verification of the selected fresh testnet deployment. No key material is loaded.
+import '../../server/env.ts';
+import {VERIFIER_METHODS,RELAYER_METHODS} from '../testnet-scopes.ts';
+import {USDC,CHAIN_ID} from '../../server/crypto/evm.ts';
+const config=process.env;
+if((config.NEAR_NETWORK??'testnet')!=='testnet')throw new Error('Preflight is for NEAR testnet only');
+const rpc=(config.NEAR_RPC??'https://rpc.testnet.near.org').split(',')[0]!.trim();
+async function query(params:Record<string,unknown>){
+ const response=await fetch(rpc,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:'preflight',method:'query',params:{finality:'final',...params}}),signal:AbortSignal.timeout(15_000)});
+ if(!response.ok)throw new Error('RPC unavailable');
+ const body=await response.json() as any;if(body.error||!body.result||body.result.error)throw new Error('RPC query failed');return body.result;
 }
-if ((env.NEAR_NETWORK ?? "testnet") !== "testnet") throw new Error("Preflight is for NEAR testnet only");
-const rpc = (env.NEAR_RPC ?? "https://rpc.testnet.near.org").split(",")[0]!.trim();
-const query = async (params: Record<string, unknown>) => {
-  const r = await fetch(rpc, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: "preflight", method: "query", params: { finality: "final", ...params } }), signal: AbortSignal.timeout(15_000) });
-  return (await r.json()) as { result?: any; error?: any };
-};
-const view = async (account: string, method: string, args: unknown) => {
-  const r = await query({ request_type: "call_function", account_id: account, method_name: method, args_base64: Buffer.from(JSON.stringify(args)).toString("base64") });
-  const err = r.error ? JSON.stringify(r.error) : r.result?.error;
-  return err ? { ok: false, missing: /MethodNotFound/.test(String(err)), error: String(err).slice(0, 140) } : { ok: true, missing: false };
-};
-const verified = (env.MARKET_VERIFIED_CODE_HASHES ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-const report: Record<string, unknown> = { network: "testnet", rpc: new URL(rpc).host, verifiedHashes: verified.length };
-const rails = [
-  { rail: "bank (Monerium sandbox)", contract: env.ESCROW_CONTRACT_ID, method: "get_bounty_market", args: { job_id: 0 }, needs: ["bind_market_assignment", "record_market_submission", "expire_market_assignment", "withdraw_market_assignment", "release_market_assignment"] },
-  { rail: "USDC (Base Sepolia)", contract: env.CRYPTO_ESCROW_CONTRACT_ID, method: "get_crypto_market", args: { id: "00000000-0000-0000-0000-000000000000" }, needs: ["bind_crypto_assignment", "record_crypto_submission", "expire_crypto_assignment", "withdraw_crypto_assignment", "release_crypto_bounty"] },
-];
-const verifiers = [env.GITHUB_VERIFIER_ACCOUNT_ID, env.CRYPTO_VERIFIER_ACCOUNT_ID];
-for (const [i, r] of rails.entries()) {
-  if (!r.contract) { report[r.rail] = { configured: false }; continue; }
-  const account = await query({ request_type: "view_account", account_id: r.contract });
-  const codeHash = account.result?.code_hash ?? null;
-  const probe = await view(r.contract, r.method, r.args);
-  const verifier = verifiers[i];
-  let scopes: string[] | null = null;
-  if (verifier) {
-    const keys = await query({ request_type: "view_access_key_list", account_id: verifier });
-    scopes = (keys.result?.keys ?? []).flatMap((k: any) => k.access_key?.permission?.FunctionCall?.receiver_id === r.contract ? [k.access_key.permission.FunctionCall.method_names.length ? k.access_key.permission.FunctionCall.method_names.join(" ") : "(all methods)"] : []);
+async function view(account:string,method:string,args:unknown={}){const result=await query({request_type:'call_function',account_id:account,method_name:method,args_base64:Buffer.from(JSON.stringify(args)).toString('base64')});return JSON.parse(Buffer.from(result.result).toString());}
+const verified=(config.MARKET_VERIFIED_CODE_HASHES??'').split(',').map(s=>s.trim()).filter(Boolean);
+const rails=[
+ {name:'bank',contract:config.ESCROW_CONTRACT_ID,client:config.CLIENT_ACCOUNT_ID,verifier:config.GITHUB_VERIFIER_ACCOUNT_ID,relayer:config.RELAYER_ACCOUNT_ID},
+ {name:'usdc',contract:config.CRYPTO_ESCROW_CONTRACT_ID,client:config.CRYPTO_CLIENT_ACCOUNT_ID,verifier:config.CRYPTO_VERIFIER_ACCOUNT_ID,relayer:config.CRYPTO_RELAYER_ACCOUNT_ID},
+] as const;
+const selected=process.argv.includes('--usdc-only')?rails.filter(r=>r.name==='usdc'):rails;
+const report:any={network:'testnet',rails:[]};
+for(const rail of selected){
+ const row:any={rail:rail.name,contract:rail.contract??null,ready:false};report.rails.push(row);
+ try{
+  if(!rail.contract?.endsWith('.testnet')||!rail.client||!rail.verifier||!rail.relayer)throw new Error('Missing testnet role configuration');
+  const state=await query({request_type:'view_account',account_id:rail.contract});row.codeHash=state.code_hash;row.codeHashVerified=verified.includes(state.code_hash);
+  const cfg=await view(rail.contract,'get_config');
+  row.rolesMatch=cfg.verifier===rail.verifier&&cfg.relayer===rail.relayer&&cfg.operators.length===1&&cfg.operators[0]===rail.client&&new Set([cfg.owner,rail.verifier,rail.client,rail.relayer]).size===4;
+  row.unpaused=cfg.paused===false;
+  row.railMatches=rail.name==='bank'||(cfg.chain_id===String(CHAIN_ID)&&cfg.token===USDC);
+  row.interfaceMatches=await view(rail.contract,'get_bounty',{bounty_id:rail.name==='bank'?'18446744073709551615':'00000000-0000-0000-0000-000000000000'})===null;
+  row.scopedKeys={};
+  for(const role of ['verifier','relayer'] as const){
+   const keys=(await query({request_type:'view_access_key_list',account_id:rail[role]})).keys;
+   const expected=role==='verifier'?VERIFIER_METHODS[rail.name]:RELAYER_METHODS[rail.name];
+   row.scopedKeys[role]=keys.length===1&&keys.every((k:any)=>{const fc=k.access_key.permission?.FunctionCall;return fc&&fc.receiver_id===rail.contract&&JSON.stringify([...fc.method_names].sort())===JSON.stringify([...expected].sort())&&fc.allowance!==null&&BigInt(fc.allowance)>0n;});
   }
-  report[r.rail] = {
-    contract: r.contract,
-    codeHash,
-    codeHashVerified: Boolean(codeHash && verified.includes(codeHash)),
-    deadlineMethodsDeployed: probe.ok,
-    verifierFunctionCallKeys: scopes,
-    verifierKeyCoversNewMethods: scopes === null ? "unknown (no verifier configured)" : scopes.some((s) => s === "(all methods)" || r.needs.every((m) => s.split(" ").includes(m))),
-  };
+  row.ready=row.codeHashVerified&&row.rolesMatch&&row.unpaused&&row.railMatches&&row.interfaceMatches&&row.scopedKeys.verifier&&row.scopedKeys.relayer;
+ }catch(error){row.error=error instanceof Error&&['Missing testnet role configuration','RPC unavailable','RPC query failed'].includes(error.message)?error.message:'Unable to verify this deployment';}
 }
-console.log(JSON.stringify(report, null, 2));
-const selected = process.argv.includes("--usdc-only") ? rails.filter(r => r.rail.startsWith("USDC")) : rails;
-const ready = selected.every((r) => (report[r.rail] as any)?.deadlineMethodsDeployed && (report[r.rail] as any)?.codeHashVerified && (report[r.rail] as any)?.verifierKeyCoversNewMethods === true);
-console.log(ready ? "\nSelected rails: extended contract deployed, scoped and verified. Run the E2E runbook." : "\nNot ready: deploy the reviewed WASM on testnet, verify it, then add its code hash to MARKET_VERIFIED_CODE_HASHES. No transaction was sent.");
+console.log(JSON.stringify(report,null,2));
+process.exitCode=report.rails.every((r:any)=>r.ready)?0:1;

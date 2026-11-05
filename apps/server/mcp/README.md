@@ -14,7 +14,7 @@ Requires Node.js 22.18 or newer (Node.js 24 recommended), npm, and a GitHub acco
 Use macOS, Linux or WSL. Install:
 
 ```sh
-npm install -g nearportal-mcp@0.1.0
+npm install -g nearportal-mcp@0.2.0
 nearportal-mcp login --server https://nearportal.com --scopes read
 nearportal-mcp status
 ```
@@ -97,3 +97,14 @@ Full guide and troubleshooting: https://nearportal.com/mcp.
 This Apache-2.0 package contains only the local MCP client and its source.
 It contains no backend, database, private configuration, credentials or custody
 keys. Runtime dependencies are the MCP SDK, tsx and Zod, with exact direct versions.
+
+## Creator refund wallet
+
+Version 0.2 requires `refundAddress` in every `prepare_bounties` item: a public
+Base Sepolia wallet controlled by the creator. It is fixed in the funding agreement
+and must differ from the contributor’s payout wallet. Only an owner-approved
+dispute refund can return recorded unspent deposits there. A dispute cannot waive
+checks or merge for developer payments. Assignment expiry does not refund funds.
+
+The redesigned contract requires a fresh deployment. This version is not a storage
+migration or an upgrade of an already funded contract.

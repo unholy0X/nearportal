@@ -1,6 +1,6 @@
 {
   "name": "nearportal-mcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Connect a coding agent to NearPortal GitHub bounties on Base Sepolia testnet.",
   "type": "module",
   "license": "Apache-2.0",

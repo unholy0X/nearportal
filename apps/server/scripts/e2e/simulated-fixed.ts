@@ -34,6 +34,7 @@ let issueNumber = 40;
 const gh = createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", "http://x");
   const send = (status: number, body: unknown) => { res.writeHead(status, { "Content-Type": "application/json" }); res.end(JSON.stringify(body)); };
+  if (url.pathname === "/user/repos") return send(200, [{id:100,full_name:"acme/widgets",private:false,permissions:{push:true},archived:false,default_branch:"main"}]);
   const pull = /^\/repos\/acme\/widgets\/pulls\/(\d+)$/.exec(url.pathname);
   if (pull) return prs.has(Number(pull[1])) ? send(200, prs.get(Number(pull[1]))) : send(404, {});
   if (url.pathname === "/repos/acme/widgets/issues" && req.method === "POST") { issueNumber++; return send(201, { number: issueNumber, html_url: `https://github.com/acme/widgets/issues/${issueNumber}` }); }
@@ -107,6 +108,11 @@ async function shot(name: string, who: string, path: string, width = 1440) {
   page.on("console", (m: any) => { if (m.type() === "error" && !/favicon|Failed to load resource/.test(m.text())) errors.push(m.text()); });
   await page.goto(ORIGIN + path, { waitUntil: "networkidle" });
   await page.waitForTimeout(400);
+  if(name==='create-reward-step') {
+    await page.locator('[name="payment-rail"][value="base-usdc"]').check();
+    await page.locator('#refund-address').fill('0x'+'c1ea2'.repeat(8));
+    check(`creator refund wallet is visible and editable @${width}`,await page.locator('#refund-wallet-field').isVisible()&&!(await page.locator('#error-banner').isVisible()));
+  }
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
   // A render exception is caught by the page and shown as a connection problem: treat it as an error.
   if (await page.evaluate(() => /Connection interrupted/.test(document.body.innerText))) errors.push("page reports a failed load/render");
@@ -115,7 +121,7 @@ async function shot(name: string, who: string, path: string, width = 1440) {
   await context.close();
 }
 
-const draft = (rail: "bank" | "base-usdc") => ({ repository: "acme/widgets", title: rail === "bank" ? "Export filtered rows to CSV" : "Add USDC receipt links", description: "Implement the feature with tests.", criteria: "Escape commas and quotes\nKeep zero and false", amountCents: 2500, branch: "main", checkName: "acceptance", workflowPath: ".github/workflows/acceptance.yml", protectedPaths: "package.json", marketTerms: { kind: "fixed", deliveryHours: 48 }, ...(rail === "base-usdc" ? { paymentRail: "base-usdc" } : {}) });
+const draft = (rail: "bank" | "base-usdc") => ({ repository: "acme/widgets", title: rail === "bank" ? "Export filtered rows to CSV" : "Add USDC receipt links", description: "Implement the feature with tests.", criteria: "Escape commas and quotes\nKeep zero and false", amountCents: 2500, branch: "main", checkName: "acceptance", workflowPath: ".github/workflows/acceptance.yml", protectedPaths: "package.json", marketTerms: { kind: "fixed", deliveryHours: 48 }, ...(rail === "base-usdc" ? { paymentRail: "base-usdc", refundAddress: "0x" + "c1ea2".repeat(8) } : {}) });
 
 async function fundedBounty(rail: "bank" | "base-usdc") {
   const created = await api("owner", "/bounties", draft(rail));
@@ -191,6 +197,7 @@ try {
   const list = await api("bo", "/bounties?scope=explore&limit=48");
   check("Explore lists all four deadline bounties with server-side counts", list.data.total === 4, JSON.stringify(list.data.counts));
   await shot("create-reward-step", "owner", "/app/new");
+  await shot("create-reward-step", "owner", "/app/new", 390);
   const metrics = await fetch(`${ORIGIN}/api/ops/metrics`).then((r) => r.text());
   check("market commands are observable in metrics", /market_commands_total\{command="claim"\}/.test(metrics));
 } catch (error) {

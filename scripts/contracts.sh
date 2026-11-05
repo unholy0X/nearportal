@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Test, lint and build the NEAR contracts inside the pinned cargo-near image.
 #
-# Usage: scripts/contracts.sh <test|lint|build>
+# Usage: scripts/contracts.sh <test|lint|build|format>
 #
 #   test   cargo test --workspace --locked (common, escrow, usdc-escrow)
 #   lint   cargo fmt --all --check and cargo clippy --all-targets -D warnings
@@ -63,11 +63,14 @@ hash_wasm() {
 
 [ $# -eq 1 ] || usage 1
 case "$1" in
-  test | lint | build) prepare_volumes ;;
+  test | lint | build | format) prepare_volumes ;;
 esac
 case "$1" in
   test)
     run_in . cargo test --workspace --locked
+    ;;
+  format)
+    run_in . cargo fmt --all
     ;;
   lint)
     run_in . "cargo fmt --all --check && echo 'cargo fmt: ok' &&

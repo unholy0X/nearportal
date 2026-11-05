@@ -6,7 +6,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { createHmac, randomBytes } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 
-const compose = ['compose', '-p', 'npsmoke', '-f', 'deploy/staging/compose.smoke.yaml'];
+const compose = ['compose', '-p', process.env.NEARPORTAL_SMOKE_PROJECT || 'npsmoke', '-f', 'deploy/staging/compose.smoke.yaml'];
 const env = { ...process.env, SMOKE_KEY: randomBytes(32).toString('base64') };
 const docker = (...args) => execFileSync('docker', args, { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 const origin = 'https://nearportal.test';
@@ -104,6 +104,8 @@ try {
 
   const logs = docker(...compose, 'logs', 'nearportal');
   check('no secrets in container logs', !/smoke-client-secret|smoke-metrics-token|smoke-admin-token|FR1420041010050500013M02606|np_session=/.test(logs + docker('inspect', '--format', '{{json .State}}', app)));
+  const recovery = JSON.parse(docker('exec', app, 'node', '--import', 'tsx', 'scripts/backup-drill.ts'));
+  check('packaged backup/restore verifies the database and encrypted session credentials', recovery.ok === true && recovery.usersDecrypted === 1);
   docker(...compose, 'stop', '-t', '45', 'nearportal');
   const stopped = docker(...compose, 'logs', 'nearportal');
   check('graceful shutdown completes cleanly', /"event":"server.stopped","requestId":null,"clean":true|"event":"server.stopped"[^\n]*"clean":true/.test(stopped), (stopped.match(/.*server\.stopped.*/) || [''])[0].slice(0, 160));

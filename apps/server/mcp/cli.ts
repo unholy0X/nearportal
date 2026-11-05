@@ -13,7 +13,7 @@ import { registerTools } from "./tools.ts";
 const toErr = (...a: unknown[]) => process.stderr.write(format(...a) + "\n");
 console.log = console.info = console.debug = console.warn = toErr;
 const say = toErr;
-export const VERSION = "0.1.0";
+export const VERSION = "0.2.0";
 
 const argv = process.argv.slice(2);
 const flag = (name: string) => argv.includes(`--${name}`);

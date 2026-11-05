@@ -1,3 +1,4 @@
+import { Store as RelayerStore } from '../../../services/relayer/src/store.ts';
 // Capacity, concurrency, crash-recovery and provider-failure tests for the hosted testnet demo.
 // Everything here is isolated: temporary databases, simulated payment adapter, mocked GitHub.
 import test from "node:test";
@@ -583,14 +584,19 @@ test("backup → restore drill on a temporary database, key pairing enforced", (
     const store = new PortalStore(tasks.db, db.dir, key);
     store.saveUser({ id: 7, login: "u", name: "U", avatar: "", token: "secret-token", createdAt: "" });
     tasks.db.prepare("INSERT INTO tasks(id,body) VALUES('t1',?)").run(JSON.stringify({ id: "t1", payment: { state: "Signing" } }));
-    writeFileSync(join(db.dir, "github-relayer.json"), JSON.stringify({ jobs: { 3: {} }, reportedOrders: [], submitted: {}, pendingSubmissions: { 4: { memo: "m", at: "" } } }));
+    tasks.db.prepare("INSERT INTO tasks(id,body) VALUES('t2',?)").run(JSON.stringify({id:'t2',payment:{state:'NotRequested'},refund:{state:'Signing'}}));
+    const journal=new RelayerStore(join(db.dir,'github-relayer.json'));
+    journal.state.bounties[3]={client:{iban:'FR1420041010050500013M02606',country:'FR'}};
+    journal.state.pendingSubmissions={4:{memo:'m',at:''}};journal.save();
     process.env.PORTAL_ENCRYPTION_KEY = key.toString("base64");
     const out = join(db.dir, "backup");
     const manifest = backup({ dataDir: db.dir, dbPath: db.path, out });
-    assert.equal(manifest.counts.tasks, 1);
+    assert.equal(manifest.counts.tasks, 2);
     const restored = restoreCheck({ backup: out, target: join(db.dir, "restore"), key });
     assert.equal(restored.usersDecrypted, 1);
     assert.equal(restored.paymentsInFlight, 1);
+    assert.equal(restored.refundsInFlight, 1);
+    assert.equal(restored.journals[0]!.bounties, 1);
     assert.equal(restored.journals[0]!.pendingSubmissions, 1, "uncertain submissions survive restore");
     assert.throws(() => restoreCheck({ backup: out, target: join(db.dir, "restore2"), key: randomBytes(32) }), /does not belong/);
     assert.throws(() => restoreCheck({ backup: out, target: join(db.dir, "restore"), key }), /must be empty/);
