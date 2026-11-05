@@ -283,6 +283,7 @@ export async function portalRuntime(
     if (b.paymentRail !== "base-usdc" && !user.bank && String(user.id) !== store.meta("operator") && tasks.config.mode === "sandbox")
       throw new Error("Connect Monerium in Settings before publishing");
   }
+  const fundingNudges = new Map<string, number>();
   const moneriumGate = gate("monerium", { concurrency: 2, hourlyBudget: 1200, timeoutMs: 20_000 });
   const sendLimited = (res: ServerResponse, retryAfterSeconds: number, message = "Too many requests. Please wait a moment.") => {
     res.writeHead(429, { "Content-Type": "application/json", "Cache-Control": "no-store", "Retry-After": String(retryAfterSeconds), "X-Content-Type-Options": "nosniff" });
@@ -447,6 +448,17 @@ export async function portalRuntime(
         const b = store.bounty(match[1]!);
         if (!portal.canRead(b, u)) throw new Error("Bounty not found");
         if (req.method === "GET" && !match[2]) {
+          // The creator watching an unfunded bounty brings its funding check forward (bounded per task),
+          // so a confirmed deposit appears without waiting for the background cadence.
+          if (u && b.ownerId === u.id && b.status !== "Draft") {
+            const t = portal.task(b);
+            const minGap = b.paymentRail === "base-usdc" ? 10_000 : 30_000;
+            if (t && !t.funded && !t.disputed && Date.now() - (fundingNudges.get(t.id) ?? 0) >= minGap) {
+              fundingNudges.set(t.id, Date.now());
+              if (fundingNudges.size > 5000) fundingNudges.clear();
+              tasks.store.nudge(t.id);
+            }
+          }
           const member = Boolean(
             u && b.private && (await allowedRepo(u, b.repository)),
           );

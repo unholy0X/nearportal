@@ -74,6 +74,8 @@ export class TaskStore {
   }
   /** Wake a task now (user action, webhook). */
   enqueue(id: string): void { const now = Date.now(); this.db.prepare("INSERT INTO queue(task_id,next_at) VALUES(?,?) ON CONFLICT(task_id) DO UPDATE SET next_at=MIN(next_at,excluded.next_at)").run(id, now); }
+  /** Bring a healthy scheduled check forward (a creator is watching). Never shortens a failure backoff. */
+  nudge(id: string): boolean { return Boolean(this.db.prepare("UPDATE queue SET next_at=? WHERE task_id=? AND attempts=0 AND next_at>?").run(Date.now(), id, Date.now()).changes); }
   /** Make sure a task is queued without disturbing an existing schedule or backoff. */
   ensureQueued(id: string): boolean { return Boolean(this.db.prepare("INSERT OR IGNORE INTO queue(task_id,next_at) VALUES(?,?)").run(id, Date.now()).changes); }
   delivery(id: string, ids: string[], event = ""): boolean {
