@@ -2,9 +2,11 @@
 //! so callbacks are tested with real signatures over the real payout digests.
 
 mod access;
+mod assignment;
 mod dispute;
 mod funding;
 mod payout;
+mod settlement;
 
 use crate::*;
 use k256::ecdsa::SigningKey;
