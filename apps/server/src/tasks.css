@@ -1,0 +1,56 @@
+.task-app { max-width: 1120px; gap: 28px; padding: 32px; }
+.task-wordmark { font-family: var(--mono); font-size: 17px; font-style: normal; color: var(--muted); }
+.task-new { font-size: 14px; color: var(--ink); text-decoration: none; }
+.task-mode { display: flex; align-items: center; gap: 10px; background: var(--stone); border-radius: 10px; padding: 10px 14px; font-size: 13px; color: var(--ink-2); }
+.task-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--warn); flex-shrink: 0; }
+.task-hero { padding: 24px 0 12px; max-width: 740px; }
+.task-hero h1 { font-size: clamp(46px, 7vw, 76px); line-height: 1.03; letter-spacing: -.055em; font-weight: 500; margin: 18px 0 22px; }
+.task-hero h1 em { font-family: var(--display); font-weight: 400; color: var(--klein); }
+.task-hero .lead { max-width: 650px; }
+.task-create { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.task-app .card { padding: 24px; gap: 18px; border-radius: 16px; }
+.task-app .field input,.task-app .field textarea { font-size: 16px; padding: 12px; min-width: 0; width: 100%; }
+.task-app .field label { font-size: 14px; }
+.task-app .hint { font-size: 13px; }
+.task-app .btn { font-size: 15px; height: auto; min-height: 50px; border-radius: 10px; padding: 12px; }
+.task-app p { margin: 0; }
+.task-app details { font-size: 14px; }
+.task-app summary { cursor: pointer; }
+.task-details { margin-top: 16px; }
+.task-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.task-heading h1 { font-size: clamp(30px, 5vw, 48px); letter-spacing: -.04em; line-height: 1.1; margin: 12px 0 0; }
+.task-reward { display: flex; flex-direction: column; text-align: right; flex-shrink: 0; }
+.task-reward strong { font-size: 34px; letter-spacing: -.04em; }
+.task-role { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; font-size: 13px; border-block: 1px solid var(--line); padding: 12px 0; }
+.task-role a { font-weight: 600; }
+.task-stages { list-style: none; display: flex; padding: 0; margin: 0; }
+.task-stages li { flex: 1; display: flex; gap: 10px; align-items: center; color: var(--muted); font-size: 14px; padding-block: 14px; border-bottom: 2px solid var(--line); }
+.task-stages li.done { color: var(--klein); border-color: var(--klein); }
+.task-stages li span { background: var(--stone); border-radius: 50%; width: 25px; height: 25px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; }
+.task-stages li.done span { background: #e7ebff; }
+.task-columns { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+.task-columns .stack { gap: 20px; min-width: 0; }
+.task-criteria { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px; font-size: 16px; }
+.task-criteria li { display: flex; gap: 12px; align-items: baseline; }
+.task-criteria li span { color: var(--klein); }
+.task-facts { margin: 0; font-size: 14px; display: flex; flex-direction: column; gap: 12px; }
+.task-facts div { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 12px; }
+.task-facts dt { color: var(--muted); }.task-facts dd { margin: 0; overflow-wrap: anywhere; }
+.task-acceptances { display: flex; flex-wrap: wrap; gap: 8px; }.task-acceptances .chip { font-size: 12px; }
+.task-policy { margin-block: 12px; font-size: 12px; overflow-wrap: anywhere; }
+.task-hash { overflow-wrap: anywhere; font-family: var(--mono); font-size: 11px; line-height: 1.7; }
+.task-pr { font-size: 22px; font-weight: 600; text-decoration: none; }
+.task-checks { list-style: none; padding: 0; margin: 0; font-size: 15px; display: flex; flex-direction: column; gap: 8px; }
+.task-reason { font-size: 14px; color: var(--warn); }
+.task-fixture { display: flex; flex-direction: column; gap: 12px; background: var(--stone); padding: 16px; border-radius: 10px; }
+.task-fixture-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.task-fixture-buttons button { background: white; border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-size: 13px; cursor: pointer; }
+.task-money { background: var(--vault); color: white; border: 0; }.task-money.paid { background: #12492f; }
+.task-money strong { font-size: 52px; letter-spacing: -.05em; line-height: 1.1; }.task-money p { font-size: 14px; color: #cdd0d7; }
+.task-money .eyebrow { color: #cdd0d7; }.task-money .chip { background: #ffffff1a; color: white; align-self: flex-start; font-size: 12px; }
+.task-money .btn { background: var(--ruban); color: var(--ink); }
+.task-timeline { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 18px; font-size: 13px; }
+.task-timeline li { padding-left: 14px; border-left: 2px solid var(--line); display: flex; flex-direction: column; gap: 5px; }
+.task-timeline time { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+.task-footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--muted); font-size: 12px; }
+@media (max-width: 740px) { .task-app { padding: 22px 18px; border-radius: 0; }.task-create,.task-columns { grid-template-columns: 1fr; }.task-stages li { flex-direction: column; gap: 6px; font-size: 11px; }.task-heading { align-items: flex-start; }.task-reward strong { font-size: 26px; }.task-app .card { padding: 18px; }.task-role .hint { width: 100%; }.task-wordmark { font-size: 13px; } }

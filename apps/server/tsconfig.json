@@ -12,5 +12,5 @@
     "allowImportingTsExtensions": true,
     "types": ["node"]
   },
-  "include": ["server", "scripts", "mcp"]
+  "include": ["src", "server", "scripts", "mcp"]
 }

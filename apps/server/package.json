@@ -5,6 +5,7 @@
     "node": ">=22.18"
   },
   "scripts": {
+    "demo": "node scripts/dev.mjs",
     "tasks:start": "tsx server/tasks.ts",
     "tasks:setup": "node --import tsx scripts/task-setup.ts",
     "sandbox:deploy": "node --import tsx scripts/sandbox-deploy.ts",
@@ -12,6 +13,9 @@
     "sandbox:smoke": "node --import tsx scripts/sandbox-smoke.ts",
     "sandbox:bank": "node --import tsx scripts/sandbox-bank.ts",
     "sandbox:start": "ENV_FILE=.env.sandbox node --import tsx server/tasks.ts",
+    "dev": "node scripts/dev.mjs",
+    "web": "vite",
+    "build": "vite build",
     "start": "node --import tsx server/tasks.ts",
     "typecheck": "tsc --noEmit",
     "sandbox:upgrade": "ENV_FILE=.env.sandbox node --import tsx scripts/sandbox-upgrade.ts",

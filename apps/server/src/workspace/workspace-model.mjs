@@ -17,7 +17,7 @@ export const STATUSES = Object.freeze({
   attention: { label: 'Needs attention', tone: 'attention', icon: 'alert', stage: 'review' },
 });
 
-/** Sealed-bid phases from the market engine (nearportal-app/server/portal/market.ts, Market["phase"]).
+/** Sealed-bid phases from the market engine (apps/server/server/portal/market.ts, Market["phase"]).
  *  "offered" = the selected winner has not yet confirmed. Shown only when the backend enables
  *  sealed bids and reports the phase; today `bountyModeCapabilities.sealedBid` is false. */
 export const MARKET_PHASES = Object.freeze({ bidding: 'bidding', offered: 'awaitingConfirmation' });
