@@ -13,6 +13,7 @@ import {
   verifyTaskPayout,
   payoutLabel,
   shortIban,
+  bankRefundCommitment,
 } from "./payout.ts";
 import { StaleWriteError, TaskStore } from "./store.ts";
 import { KeyedLock } from "../ops/locks.ts";
@@ -30,6 +31,7 @@ export interface TaskConfig {
   mode: "simulation" | "sandbox";
   githubMode: "fixture" | "live";
   verifier: string;
+  cryptoVerifier?: string;
   recipient: string;
   refundShortIban?: string;
   sandboxPayoutIbans?: readonly string[];
@@ -98,10 +100,15 @@ export class TaskService {
       ownerId?: number;
       portalId?: string;
       portalCode?: string;
+      bankRefund?: Record<string, unknown>;
       market?: { kind: "fixed"; deliveryHours: number };
     } = {},
   ) {
     if (input.paymentRail !== "base-usdc" && !bankPaymentsEnabled()) throw new Error(BANK_DISABLED_MESSAGE);
+    const bankRefund = input.paymentRail !== "base-usdc" && options.bankRefund
+      ? parsePayout(options.bankRefund, this.config.mode === "sandbox" ? this.config.sandboxPayoutIbans : []) : undefined;
+    if (this.config.mode === "sandbox" && options.ownerId && input.paymentRail !== "base-usdc" && !bankRefund)
+      throw new Error("Save the creator's refund bank details in Settings before publishing");
     if (input.marketTerms !== undefined && !options.market)
       throw new Error("Versioned bounty terms require the market payment adapter; they cannot use a legacy task mandate");
     if (options.market && (!options.openBounty || options.market.kind !== "fixed"))
@@ -197,6 +204,7 @@ export class TaskService {
       amountCents: amountCents as number,
       currency: input.paymentRail === "base-usdc" ? "USD" : "EUR",
       ...(input.paymentRail === "base-usdc" ? {paymentRail:"base-usdc" as const, refundAddress: evmAddress(input.refundAddress)} : {}),
+      ...(bankRefund ? { bankRefundCommitment: bankRefundCommitment(options.ownerId!, bankRefund), bankRefundRecipient: shortIban(bankRefund.iban) } : {}),
       repository,
       branch,
       workflowPath,
@@ -205,7 +213,7 @@ export class TaskService {
         ? { developerId: 0, developerLogin: "Unclaimed" }
         : {}),
       mergeMethod: "any",
-      verifier: this.config.verifier,
+      verifier: input.paymentRail === "base-usdc" ? (this.config.cryptoVerifier ?? this.config.verifier) : this.config.verifier,
       recipient: options.openBounty
         ? "Assigned after a funded developer claim"
         : "Awaiting developer payout details",
@@ -219,6 +227,7 @@ export class TaskService {
     const task: Task = {
       id: randomUUID(),
       ...(options.ownerId ? { ownerId: options.ownerId } : {}),
+      ...(bankRefund ? { bankRefund } : {}),
       ...(options.portalId ? { portalId: options.portalId } : {}),
       ...(options.openBounty
         ? {
@@ -260,6 +269,7 @@ export class TaskService {
       developerTokenHash: _d,
       payout: _p,
       bankProfileKey: _bank,
+      bankRefund: _refund,
       ...safe
     } = t;
     if (t.policy.paymentRail === "base-usdc") safe.timeline = safe.timeline.map(event => event.message === "Monerium deposit confirmed in escrow." ? { ...event, message: "USDC deposit confirmed on Base Sepolia and recorded in NEAR escrow." } : event);
@@ -298,7 +308,7 @@ export class TaskService {
       input,
       this.config.mode === "sandbox" ? this.config.sandboxPayoutIbans : [],
     );
-    if (shortIban(payout.iban) === this.config.refundShortIban)
+    if (shortIban(payout.iban) === (t.policy.bankRefundRecipient ?? this.config.refundShortIban))
       throw new Error(
         "Use a payout IBAN distinct from the client's refund account",
       );
@@ -346,7 +356,7 @@ export class TaskService {
       input,
       this.config.mode === "sandbox" ? this.config.sandboxPayoutIbans : [],
     );
-    if (shortIban(payout.iban) === this.config.refundShortIban)
+    if (shortIban(payout.iban) === (t.policy.bankRefundRecipient ?? this.config.refundShortIban))
       throw new Error(
         "Use a payout IBAN distinct from the client's refund account",
       );
@@ -379,7 +389,7 @@ export class TaskService {
     if (destination.kind === "bank") {
       if (t.policy.paymentRail === "base-usdc") throw new Error("This bounty pays in USDC: connect a wallet destination");
       const payout = parsePayout(destination.payout, this.config.mode === "sandbox" ? this.config.sandboxPayoutIbans : []);
-      if (shortIban(payout.iban) === this.config.refundShortIban) throw new Error("Use a payout IBAN distinct from the client's refund account");
+      if (shortIban(payout.iban) === (t.policy.bankRefundRecipient ?? this.config.refundShortIban)) throw new Error("Use a payout IBAN distinct from the client's refund account");
       t.payout = payout;
       t.policy.recipient = payoutLabel(payout);
       t.policy.payoutCommitment = payoutCommitment(developer.id, payout);

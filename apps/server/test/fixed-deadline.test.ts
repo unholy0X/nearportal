@@ -85,6 +85,31 @@ const submit = (w: World, b: Bounty, user: User, n: number, extra: Record<string
 const market = (w: World, b: Bounty) => w.markets.get(b.id);
 const calls = (w: World, method: string) => w.chain.calls.filter((c) => c.method === method).length;
 
+test('100 isolated v2 lifecycles: 50 bank and 50 USDC settle once and reject premature payment', async () => {
+  for (const rail of ['bank', 'base-usdc'] as Rail[]) {
+    const w = world(rail);
+    try {
+      for (let i = 0; i < 50; i++) {
+        const b = await bounty(w);
+        await fund(w, b);
+        await claim(w, b, alice);
+        await pass(w, b, 2);
+        pr(w, i + 1, alice, `${b.code}-A1`);
+        await submit(w, b, alice, i + 1);
+        w.service.simulate(w.tasks.get(b.taskId!), 'ready', 'developer');
+        await pass(w, b);
+        assert.equal(w.tasks.get(b.taskId!).payment.state, 'NotRequested');
+        w.service.simulate(w.tasks.get(b.taskId!), 'merged', 'client');
+        await pass(w, b, 3);
+        assert.equal(market(w, b).phase, 'paid');
+        await pass(w, b, 2);
+      }
+      assert.equal(calls(w, 'settle_bounty'), 50);
+      assert.equal((w.tasks.db.prepare('SELECT COUNT(*) AS n FROM releases').get() as {n:number}).n, 50);
+    } finally { w.tasks.close(); }
+  }
+});
+
 for (const rail of ["bank", "base-usdc"] as Rail[]) {
   const R = rail === "bank" ? "[bank]" : "[usdc]";
 

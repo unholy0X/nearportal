@@ -70,7 +70,13 @@ export async function portalRuntime(
   ) {
     try {
       const { view } = await import("../chain.ts");
-      await view("get_open_bounty_mandate", { job_id: 0 });
+      const config = await view<{owner:string;operators:string[];verifier:string;relayer:string;max_reward_cents:string;paused:boolean}>("get_config");
+      if (config.owner !== env.owner || config.verifier !== process.env.GITHUB_VERIFIER_ACCOUNT_ID ||
+          config.relayer !== env.relayer || !config.operators?.includes(env.client) ||
+          !/^[1-9][0-9]*$/.test(config.max_reward_cents ?? "") || config.paused)
+        throw new Error("Bank deployment configuration mismatch");
+      if (await view("get_bounty", { bounty_id: "18446744073709551615" }) !== null)
+        throw new Error("Bank deployment interface mismatch");
       openBountyReady = true;
     } catch {
       /* Tested extension awaits approved deployment. */
@@ -210,7 +216,7 @@ export async function portalRuntime(
       };
       [bankHash, cryptoHash] = await Promise.all([bankPaymentsEnabled() ? codeHash(env.contractId) : Promise.resolve(null), cryptoReady ? codeHash(process.env.CRYPTO_ESCROW_CONTRACT_ID) : Promise.resolve(null)]);
     }
-    const rails = { bank: bankPaymentsEnabled() && railVerified(tasks.config.mode, bankHash), "base-usdc": tasks.config.mode === "simulation" || (cryptoReady && railVerified(tasks.config.mode, cryptoHash)) };
+    const rails = { bank: bankPaymentsEnabled() && openBountyReady && railVerified(tasks.config.mode, bankHash), "base-usdc": tasks.config.mode === "simulation" || (cryptoReady && railVerified(tasks.config.mode, cryptoHash)) };
     setFixedDeadlineRails(rails, tasks.config.mode === "simulation" ? "Simulation: deadline bounties run on the simulated escrow chain; no funds move." : rails.bank || rails["base-usdc"] ? "Enabled for the rails whose deployed escrow code was verified." : "The deployed escrow contracts do not have verified deadline support yet.");
     if (maintenanceEnabled()) setFixedDeadlineRails({ bank: false, "base-usdc": false }, MAINTENANCE_MESSAGE);
   }

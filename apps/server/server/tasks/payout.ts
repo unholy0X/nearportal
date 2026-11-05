@@ -17,6 +17,18 @@ export const payoutLabel = (p: PayoutDetails) =>
 export const payoutCommitment = (developerId: number, p: PayoutDetails) =>
   hash({ developerId, ...p });
 
+export const bankRefundCommitment = (ownerId: number, p: PayoutDetails) =>
+  hash({ kind: "bank-refund", ownerId, ...p });
+
+export function bankRefundFor(t: Task): PayoutDetails {
+  const p = t.bankRefund, policy = t.fundingPolicy ?? t.policy;
+  if (!p || !t.ownerId || hash(policy) !== (t.fundingPolicyHash ?? t.policyHash) ||
+      bankRefundCommitment(t.ownerId, p) !== policy.bankRefundCommitment ||
+      shortIban(p.iban) !== policy.bankRefundRecipient)
+    throw new Error("Creator refund destination is missing or changed; review the funding agreement");
+  return p;
+}
+
 export function parsePayout(
   input: Record<string, unknown>,
   sandboxIbans: readonly string[] = [],

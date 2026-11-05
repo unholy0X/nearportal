@@ -12,6 +12,9 @@ export interface TaskPolicy {
   paymentRail?: "base-usdc";
   /** Client destination, fixed in the funding agreement before deposits. */
   refundAddress?: string;
+  /** Salted commitment and masked IBAN of the creator's immutable bank refund destination. */
+  bankRefundCommitment?: string;
+  bankRefundRecipient?: string;
   repository: string;
   repositoryId: number;
   branch: string;
@@ -170,6 +173,7 @@ export interface Task {
   mode: "simulation" | "sandbox";
   githubMode: "fixture" | "live";
   bankProfileKey?: string;
+  bankRefund?: PayoutDetails;
   refund?: {state: PaymentState; reference: string|null; error: string|null};
   crypto?: { startBlock: string; scanBlock: string; address: string; depositedUnits: string; surplusUnits: string; verifiedFundingHash?: string; deposits?: { txHash: string; logIndex: number; blockNumber: string; units: string }[]; receiptBackfillTo?: string };
   ownerId?: number;

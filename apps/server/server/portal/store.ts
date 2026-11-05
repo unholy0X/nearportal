@@ -40,6 +40,8 @@ export interface Bounty {
   paymentRail?: "base-usdc";
   /** Client destination, fixed in the funding agreement before deposits. */
   refundAddress?: string;
+  /** Encrypted creator refund details captured when the bank bounty is published. */
+  bankRefund?: string;
   marketTerms?: import("./market.ts").MarketTerms;
   id: string;
   code: string;

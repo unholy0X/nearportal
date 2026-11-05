@@ -21,7 +21,7 @@ services:
       GITHUB_USE_CLI: "0"
       NEAR_NETWORK: testnet
       MONERIUM_CHAIN: basesepolia
-      TASK_BANK_ENABLED: "0"
+      TASK_BANK_ENABLED: ${NEARPORTAL_BANK_ENABLED:-0}
     ports:
       - "127.0.0.1:${NEARPORTAL_PORT:-3211}:8787"
     volumes:

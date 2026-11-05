@@ -66,8 +66,10 @@ function selectedRepo() { return state.repos.find(repo => repo.fullName === stat
 function renderSummary() {
   const crypto = state.draft.paymentRail === 'base-usdc';
   $('#refund-wallet-field').hidden = !crypto;
-  $('#review-refund').hidden = !crypto;
-  $('#review-refund').textContent = 'Refund wallet (fixed before funding): ' + (state.draft.refundAddress || 'Required');
+  $('#review-refund').hidden = false;
+  $('#review-refund').textContent = crypto
+    ? 'Refund wallet (fixed before funding): ' + (state.draft.refundAddress || 'Required')
+    : 'Refund bank account (fixed at publication): ' + (state.me?.payout?.iban || 'Save your bank details in Settings first');
   document.querySelectorAll('[name="payment-rail"]').forEach(input => { input.checked = input.value === state.draft.paymentRail; });
   document.querySelectorAll('[data-money-unit]').forEach(n => n.textContent = crypto ? 'USDC' : 'EUR');
   const repo = selectedRepo();

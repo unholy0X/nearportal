@@ -12,7 +12,7 @@ import { SimChain, type SimEscrows, type SimBankBounty, type SimUsdcBounty } fro
 const provisioning = new KeyedLock();
 import { evaluateRelease } from "./release-policy.ts";
 import { hash, note, type Task } from "./domain.ts";
-import { payoutFor, shortIban } from "./payout.ts";
+import { payoutFor, shortIban, bankRefundFor } from "./payout.ts";
 import type { TaskStore } from "./store.ts";
 
 export interface PaymentAdapter {
@@ -70,7 +70,7 @@ export class SimulatedPayments implements PaymentAdapter {
     if (!b && chain.rail === "bank") {
       const id = (await chain.view<{ next_bounty_id: string }>("get_config")).next_bounty_id;
       const address = chain.deriveAddress(await chain.view<string>("get_escrow_path", { bounty_id: id }));
-      t.jobId = Number(await chain.call(chain.accounts.operator, "create_bounty", { bounty: { ...funding, refund_short_iban: SIM_REFUND_SHORT_IBAN, escrow_evm_address: address } }, "0.15"));
+      t.jobId = Number(await chain.call(chain.accounts.operator, "create_bounty", { bounty: { ...funding, refund_short_iban: t.policy.bankRefundRecipient ?? SIM_REFUND_SHORT_IBAN, escrow_evm_address: address } }, "0.15"));
       this.store.save(t);
       note(t, `Simulated escrow bounty ${t.jobId} created. No funds move.`);
     } else if (!b) {
@@ -314,7 +314,14 @@ export async function sandboxPayments(
   const monerium = new Monerium(cfg);
   const escrow = new Escrow(cfg);
   const short = shortIban;
-  const clientParty = { iban: clientIban!, firstName: "Demo", lastName: "Client", country: clientIban!.slice(0, 2) };
+  const clientParty = (t: Task) => {
+    if (t.ownerId) {
+      const p = bankRefundFor(t);
+      return { iban: p.iban, firstName: p.firstName, lastName: p.lastName, country: p.country };
+    }
+    // Legacy non-portal tasks use the explicitly configured sandbox client destination.
+    return { iban: clientIban!, firstName: "Demo", lastName: "Client", country: clientIban!.slice(0, 2) };
+  };
   /** The developer payee registered with the relayer: the claimant's account, none before a claim. */
   const developerParty = (t: Task) => {
     if (t.policy.developerId === 0) return undefined;
@@ -330,7 +337,7 @@ export async function sandboxPayments(
     for (const [id, record] of Object.entries(relayerStore.state.bounties)) {
       const task = store.all().find((t) => t.jobId === Number(id));
       if (!task) throw new Error("Relayer bounty has no matching task");
-      if (hash(record.developer ?? null) !== hash(developerParty(task) ?? null) || hash(record.client) !== hash(clientParty))
+      if (hash(record.developer ?? null) !== hash(developerParty(task) ?? null) || hash(record.client) !== hash(clientParty(task)))
         throw new Error(
           "Registered payout destination does not match the accepted task",
         );
@@ -361,6 +368,7 @@ export async function sandboxPayments(
   const adapter: PaymentAdapter = {
     market: () => marketRail,
     async prepare(t) {
+      const refund = clientParty(t);
       const verifier = t.policy.verifier;
       const fundingHash = t.fundingPolicyHash ?? t.policyHash;
       const profileKey = hash({
@@ -397,7 +405,7 @@ export async function sandboxPayments(
               funding_policy_hash: fundingHash,
               reward_cents: String(t.policy.amountCents),
               delivery_seconds: deliverySeconds(t),
-              refund_short_iban: short(clientIban!),
+              refund_short_iban: short(refund.iban),
               escrow_evm_address: address,
             },
           },
@@ -422,7 +430,7 @@ export async function sandboxPayments(
       if (
         current.reward_cents !== String(t.policy.amountCents) ||
         current.delivery_seconds !== deliverySeconds(t) ||
-        current.refund_short_iban !== short(clientIban!)
+        current.refund_short_iban !== short(refund.iban)
       )
         throw new Error(
           "Escrow economics do not match the accepted task policy.",
@@ -475,7 +483,7 @@ export async function sandboxPayments(
         const developer = developerParty(t);
         relayerStore.state.bounties[t.jobId!] = {
           ...(developer ? { developer } : {}),
-          client: clientParty,
+          client: refund,
           moveIbanHere: true,
         };
         relayerStore.save();

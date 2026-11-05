@@ -111,6 +111,7 @@ export async function taskRuntime() {
         }
       : {}),
     recipient: "Developer supplies payout details before acceptance",
+    ...(mode === "sandbox" ? { cryptoVerifier: process.env.CRYPTO_VERIFIER_ACCOUNT_ID } : {}),
     ...(mode === "sandbox"
       ? {
           refundShortIban: shortIban(

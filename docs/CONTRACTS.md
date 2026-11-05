@@ -4,6 +4,12 @@ This release uses NEAR testnet and Base Sepolia test USDC. It requires fresh
 accounts and empty application storage. Existing contract storage is incompatible;
 old deployment receipts do not validate these binaries.
 
+Hosted dual-rail deployments use distinct contracts and verifier accounts. Bank publication
+captures the creator's refund account from Settings, stores a salted commitment and masked
+IBAN in the funding policy, and passes that frozen destination to the relayer. Editing the
+creator's settings later cannot redirect a pending refund. Full refund details are excluded
+from public task/bounty responses. The encrypted publication snapshot remains private.
+
 Both rails expose `create_bounty`, `get_bounty`, `get_escrow_path`,
 `assign_developer`, `record_submission`, `expire_assignment`,
 `withdraw_assignment`, `settle_bounty`, `open_dispute`, and `resolve_dispute`.

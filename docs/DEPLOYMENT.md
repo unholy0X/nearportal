@@ -29,7 +29,8 @@ Keep root and contract keys offline. Copy only the creator, verifier and relayer
 to a private VPS directory readable by container uid 1000. Configure a new private
 environment file with production OAuth/webhook/encryption credentials, fresh contract
 and role IDs, the testnet RPCs, and the approved source's settings. Never reuse old task
-storage with new contract IDs. Keep real USDC and the bank rail disabled.
+storage with new contract IDs. Keep real USDC disabled. The bank rail is disabled by default;
+enable it only after deploying and checking its own fresh v2 contract as described below.
 
 Use `deploy/compose.vps.yaml` for an existing shared VPS. It has one app, its own data
 volume, and a loopback-only listener. It does not install a proxy or bind ports 80/443.
@@ -45,6 +46,25 @@ NEARPORTAL_ENV_FILE=/private/path/nearportal-v2.env
 NEARPORTAL_KEYS_PATH=/private/path/nearportal-v2-worker-keys
 NEARPORTAL_PORT=3211
 ```
+
+For both testnet payment rails, prepare a second plan with `--rail=bank` in a different private
+directory. Never replace the USDC account or reuse its contract storage. Configure the bank's
+`ESCROW_CONTRACT_ID`, `CLIENT_ACCOUNT_ID`, `OWNER_ACCOUNT_ID`, `GITHUB_VERIFIER_ACCOUNT_ID`
+and `RELAYER_ACCOUNT_ID`; mount its three worker keys alongside the USDC worker keys.
+Add both reviewed hashes to `MARKET_VERIFIED_CODE_HASHES`. Set `NEARPORTAL_BANK_ENABLED=1`
+in `.env.deploy`, and `TASK_BANK_ENABLED=1`, `NEARPORTAL_USDC_PILOT=0` in the private app
+environment. The old USDC-only flag deliberately refuses a bank-enabled configuration.
+Keep `TASK_PAYMENT_MODE=sandbox`, `NEAR_NETWORK=testnet`, `MONERIUM_CHAIN=basesepolia`,
+and `MONERIUM_API=https://api.monerium.dev`. Supply the sandbox-only Monerium credentials
+and legacy `TASK_CLIENT_IBAN` privately; never commit them. The startup probes require each
+rail's matching configuration and v2 interface. Run the preflight **without** `--usdc-only`.
+
+Bank creators connect their own Monerium sandbox Private application in Settings and save
+their refund bank details under Payout details before publishing. Publication freezes these
+details; subsequent settings changes do not redirect an existing refund. Contributors use
+a different payout IBAN. One Monerium sandbox profile has one movable deposit IBAN: fund
+and confirm each pending bounty before requesting the next funding destination for that
+profile. An uncertain bank create requires reconciliation, not blind retry.
 
 Run `make deploy`. Both deployment and backup commands load `.env.deploy`, so
 subsequent `git pull` and `make deploy` need no repeated configuration. `make backup`

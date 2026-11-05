@@ -2230,7 +2230,7 @@ function Settings({ me, reload }: { me: Me; reload: () => void }) {
       await api(kind, value);
       setSuccess(
         kind === "/payout"
-          ? "Payout details saved. Bounties you already claimed keep their agreed destination."
+          ? "Bank details saved. Published bounties keep their agreed payout and refund destinations."
           : "Monerium sandbox connection verified and saved.",
       );
       setBank({ clientId: "", clientSecret: "" });
@@ -2326,7 +2326,7 @@ function Settings({ me, reload }: { me: Me; reload: () => void }) {
             <div className="ui-panel-head">
               <div>
                 <h2>Payout details</h2>
-                <p>Account holder and SEPA IBAN. No crypto wallet or Monerium API keys are needed to contribute.</p>
+                <p>Account holder and SEPA IBAN for bank rewards and creator refunds. Bank contributors do not need Monerium API keys.</p>
               </div>
             </div>
             {me.payout && (
@@ -2357,7 +2357,7 @@ function Settings({ me, reload }: { me: Me; reload: () => void }) {
               ))}
             </div>
             <Notice icon="shield">
-              Full bank details stay on the server; agreements show a masked IBAN. A claimed bounty’s destination cannot be edited afterwards. Format checks do not verify account ownership.
+              These details receive your contributor rewards and refunds for bank bounties you create. Full bank details stay on the server; agreements show a masked IBAN. Published bounties keep their original destinations. Format checks do not verify account ownership.
             </Notice>
             <button className="ui-button" disabled={busy}>
               {busy ? "Saving…" : "Save payout details"}

@@ -110,8 +110,9 @@ export class PortalService {
       if (b.private && !verifiedMember) task.evidence = null;
     }
     const state = this.publicState(b, t);
+    const { bankRefund: _privateRefund, ...publicBounty } = b;
     return {
-      ...b,
+      ...publicBounty,
       preparedPrUrl:
         this.judge.enabled &&
         this.judge.repository === b.repository &&
@@ -277,6 +278,13 @@ export class PortalService {
     if (b.taskId || b.status !== "Draft")
       throw new Error("This bounty has already been submitted");
     if (b.marketTerms) requireMarketRollout(b.marketTerms.kind, b.paymentRail === "base-usdc" ? "base-usdc" : "bank");
+    if (this.tasks.config.mode === "sandbox" && b.paymentRail !== "base-usdc") {
+      const currentUser = this.store.user(u.id);
+      if (!currentUser?.payout) throw new Error("Save your refund bank details in Settings before publishing");
+      if (!currentUser.bank && String(u.id) !== this.store.meta("operator"))
+        throw new Error("Connect your Monerium sandbox account in Settings before publishing");
+      b.bankRefund = this.store.seal(parsePayout(currentUser.payout, this.tasks.config.sandboxPayoutIbans));
+    }
     b.status = "Preparing";
     b.error = null;
     this.store.save(b);
@@ -388,6 +396,7 @@ export class PortalService {
                     ownerId: u.id,
                     portalId: b.id,
                     portalCode: b.code,
+                    ...(b.bankRefund ? { bankRefund: this.store.open<Record<string, unknown>>(b.bankRefund) } : {}),
                     ...(b.marketTerms?.kind === "fixed" ? { market: { kind: "fixed" as const, deliveryHours: b.marketTerms.deliveryHours } } : {}),
                   },
                 ),
