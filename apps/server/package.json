@@ -22,7 +22,8 @@
     "sandbox:upgrade": "ENV_FILE=.env.sandbox node --import tsx scripts/sandbox-upgrade.ts",
     "portal:start": "node --import tsx server/tasks.ts",
     "treasury:setup": "ENV_FILE=.env.sandbox node --import tsx scripts/treasury-setup.ts",
-    "mcp": "node mcp/nearportal-mcp.mjs"
+    "mcp": "node mcp/nearportal-mcp.mjs",
+    "demo:sim": "ISOLATED_HOME=\"$HOME\" sh scripts/isolated.sh node --import ./test/loopback-only.mjs --import tsx scripts/e2e/mcp-demo.ts --out=output/demo-simulated"
   },
   "license": "MIT",
   "description": "NearPortal server: GitHub pull-request bounties paid from escrow on NEAR testnet.",

@@ -28,6 +28,9 @@ backups/
 # Demo and audit output
 output/
 results.json
+mcp-demo/
+e2e-simulated/
+load-results.json
 
 # Editors and OS
 .DS_Store
