@@ -256,7 +256,7 @@ ABI changes of the v2 contracts: [docs/CONTRACT-ABI-CHANGES.md](docs/CONTRACT-AB
 
 The contract sources are unchanged from `d535deb` to the live application commit
 `2c91c87d87f55c9913d1fd14f18b57f77d9df56e` (source tree `39aef2aab7706464e8956ea4a00cd55d37e8c588`),
-which runs on nearportal.com. Later commits in this repository change documentation only.
+which runs on nearportal.com. Later commits change only documentation and one test.
 Accounts, deployment transactions and budgets: [docs/TESTNET-DEPLOYMENTS.md](docs/TESTNET-DEPLOYMENTS.md).
 
 ## Run your own deployment

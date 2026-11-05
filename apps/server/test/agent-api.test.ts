@@ -216,17 +216,20 @@ test("assignment, generation and deadline persist across a restart; the deadline
   const path = join(dir, "db.sqlite");
   const w1 = await agentWorld({ path, dir });
   const { ada, b, assignment } = await claimed(w1);
-  const port = w1.port;
   await w1.close();
-  const w2 = await agentWorld({ path, dir, port });
-  w2.clock.now += 5 * H; // the terminal and server restart later
-  const a = await w2.call("GET", `/api/agent/v1/bounties/${b.id}/assignment`, { bearer: ada });
-  assert.equal(a.status, 200, JSON.stringify(a.body));
-  assert.equal(a.data.generation, assignment.generation);
-  assert.equal(a.data.marker, assignment.marker);
-  assert.equal(a.data.deadline, assignment.deadline);
-  assert.equal(a.data.remainingSecondsIndicative, assignment.remainingSecondsIndicative - 5 * 3600);
-  await w2.close();
+  // A new port: fetch could otherwise reuse a pooled socket of the closed server (ECONNRESET).
+  const w2 = await agentWorld({ path, dir });
+  try {
+    w2.clock.now += 5 * H; // the terminal and server restart later
+    const a = await w2.call("GET", `/api/agent/v1/bounties/${b.id}/assignment`, { bearer: ada });
+    assert.equal(a.status, 200, JSON.stringify(a.body));
+    assert.equal(a.data.generation, assignment.generation);
+    assert.equal(a.data.marker, assignment.marker);
+    assert.equal(a.data.deadline, assignment.deadline);
+    assert.equal(a.data.remainingSecondsIndicative, assignment.remainingSecondsIndicative - 5 * 3600);
+  } finally {
+    await w2.close(); // an open server would keep the test process alive
+  }
 });
 
 // ---------------- 13-14: submission ----------------
