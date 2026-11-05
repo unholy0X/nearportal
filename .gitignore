@@ -1,0 +1,35 @@
+# Dependencies and build output
+node_modules/
+dist/
+target/
+*.wasm
+coverage/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+!**/env.example
+*.key
+*.pem
+**/near-credentials/
+**/.near-credentials/
+
+# Runtime data
+data/
+*.db
+*.sqlite
+*.sqlite3
+*.db-wal
+*.db-shm
+*.log
+backups/
+
+# Demo and audit output
+output/
+results.json
+
+# Editors and OS
+.DS_Store
+.idea/
+.vscode/
