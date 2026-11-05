@@ -1,8 +1,10 @@
 # NearPortal v2 testnet contracts — 2026-11-05
 
-Both binaries were built from source `c0e9dc0f2f6b88391dacc54787193ec8f475b17d`.
-Application integration fixes can advance independently without replacing these contracts.
-These are test deployments, not mainnet or evidence of a completed real-provider payout.
+Both binaries were built from source `d535deb9e3f75ae52ec677f1b85e6ca0e066c29e`.
+Application integration fixes can advance independently without replacing these contracts;
+the contract sources are unchanged through the live application commit `2c91c87`.
+These are testnet deployments, not mainnet. One bank and one USDC payout have completed on them;
+see [E2E-EVIDENCE.md](E2E-EVIDENCE.md) for the receipts and how to re-check them.
 
 | Rail | Contract account and deployment transaction signer | Root account that created/funded its account tree |
 | --- | --- | --- |
@@ -43,5 +45,5 @@ limit, RPC quotas and actual gas costs. The bank sandbox moves one deposit IBAN 
 fund and confirm pending bounties sequentially for that profile. Public RPCs and provider
 timeouts can delay a run even when balances are sufficient.
 
-Complete one small funded payout on each new contract and record its receipts before
-scaling to 100. Old-contract payout receipts do not validate these deployments.
+One small funded payout has completed on each contract ([evidence](E2E-EVIDENCE.md)). Measure its
+actual costs before scaling to 100. Old-contract payout receipts do not validate these deployments.
