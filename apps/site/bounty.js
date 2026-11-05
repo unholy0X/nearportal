@@ -3,6 +3,7 @@ import { renderJourney } from '/journey.mjs';
 import { fundingProgress } from '/funding-progress.mjs';
 import { mountShell, icon as uiIcon, poll } from '/workspace-shell.mjs';
 import { bountyStatus, pullRequestUrl, editorUrl } from '/workspace-model.mjs';
+import { portalWait, portalCelebrate, CELEBRATION_MS } from '/portal-wait.mjs';
 import { bountyStage, fundingState, protectedFiles, validBountyId, explorerLinks, cryptoDepositLinks, bountyMilestones, suggestedBranch, parsePullRequest } from '/bounty-detail-model.mjs';
 const $ = selector => document.querySelector(selector);
 const id = decodeURIComponent(location.pathname.split('/').filter(Boolean).at(-1));
@@ -42,12 +43,19 @@ async function publishBankBounty() {
   if (await action('publish', { revision: state.bounty.revision })) return;
   try { const me = await api('/me'); if (me.user?.id === state.me?.user?.id) { state.me = me; render(); } } catch { /* Keep the visible error; the next focus retries. */ }
 }
+/** Celebrate once when funding is confirmed while this page is open. */
+function celebrationMark(b) {
+  if (!(state.celebrateAt && Date.now() - state.celebrateAt < CELEBRATION_MS && b.task?.funded)) return null;
+  return portalCelebrate({ startedAt: state.celebrateAt, title: 'Funds secured!', detail: b.paymentRail === 'base-usdc' ? 'Your USDC is confirmed and recorded in the NEAR escrow. Contributors can claim it now.' : 'Your deposit is confirmed in escrow. Contributors can claim it now.' });
+}
+/** True while the creator is waiting on escrow setup or a deposit; drives the animation and faster refresh. */
+function awaitingFunding(b = state.bounty) { return Boolean(b && b.role === 'client' && b.status !== 'Draft' && !b.error && !b.task?.funded && !b.task?.disputed && !b.task?.refund); }
 async function action(name, body = {}) {
   if (state.busy) return;
-  state.busy = true; state.error = ''; render();
+  state.busy = true; state.busyAction = name; state.error = ''; render();
   try { const result = await api(`/bounties/${state.bounty.id}/${name}`, body); state.bounty = result.bounty; state.consent = ''; state.claimConsent = ''; state.last = ''; if(name==='refresh'){state.refreshRequestedAt=new Date().toISOString();toast('Verification refresh requested. Results update automatically.');} return true; }
   catch (error) { state.error = error.message; return false; }
-  finally { state.busy = false; render(); }
+  finally { state.busy = false; state.busyAction = ''; render(); }
 }
 function consent(container, text, checked, onChange) {
   const label = el('label', 'reward-consent'), input = el('input'); input.type = 'checkbox'; input.checked = checked; input.disabled = state.busy;
@@ -150,6 +158,7 @@ function renderReward() {
   if (b.role === 'client' && t && !t.funded && t.jobId != null && state.treasury?.configured && !state.manualBank) description = 'Fund directly from the demo wallet, or choose bank funding. We confirm the deposit automatically.';
   // The pill already states funded / processing / paid; explanatory text only when an action is needed.
   if (!(paid || t?.funded)) box.append(el('h2', '', heading), el('p', '', description));
+  const celebrate = celebrationMark(b); if (celebrate) box.append(celebrate);
   if (b.role === 'client' && b.status === 'Draft') {
     if (state.me?.mode === 'sandbox' && (!state.me.bankConnected || !state.me.payout)) {
       if (!state.me.bankConnected) {
@@ -165,11 +174,14 @@ function renderReward() {
     }
     const escrowReady = b.paymentRail === 'base-usdc' ? state.me?.cryptoPaymentsReady : state.me?.openBountyReady;
     consent(box, `I authorize publishing this brief, locking the criteria and reward, assignment to the first eligible contributor, and automatic payout after my qualifying merge.`, state.consent === b.revision, value => { state.consent = value ? b.revision : ''; });
+    if (state.busyAction === 'publish') box.append(portalWait({ phase: 'busy', title: 'Setting up your escrow', detail: 'Publishing the brief and opening a NEAR testnet escrow for this reward.', note: 'This takes a few seconds' }));
     box.append(button(state.busy ? 'Setting up…' : 'Accept & set up escrow →', publishBankBounty, 'ui-button', state.consent !== b.revision || escrowReady === false || state.checkMismatch));
     box.append(el('p', 'action-note', 'Publishes the bounty brief and starts escrow setup. Your reward stays unfunded until the deposit is confirmed.'));
     if (state.error) { const error = el('p', 'funding-error', state.error); error.setAttribute('role', 'alert'); box.append(error); }
     if (escrowReady === false) box.append(el('p', 'action-note', 'Escrow setup is currently unavailable. Your draft is saved.'));
     if (state.checkMismatch) box.append(el('p', 'action-note', 'Fix the verification check in your draft before setting up escrow.'));
+  } else if (awaitingFunding(b) && t?.jobId == null) {
+    box.append(portalWait({ phase: 'preparing', title: 'Creating your NEAR escrow', detail: 'Locking the agreed criteria and reward. Your deposit instructions appear here next.' }));
   } else if (b.role === 'client' && t && !t.funded && t.jobId != null && renderTreasury(box,b)) {
     // Demo wallet funding is handled above; bank funding remains an explicit alternative.
   } else if (b.role === 'client' && t && !t.funded && t.jobId != null) {
@@ -177,6 +189,9 @@ function renderReward() {
     box.append(deposit);
     if (state.deposit?.iban) { box.append(copyRow(state.deposit.iban)); const bankLink = link('Open Monerium sandbox ↗', 'https://sandbox.monerium.dev/receive', 'ui-button ui-button-secondary'); box.append(bankLink, el('p', 'action-note', `In your client Monerium account, match this IBAN and simulate exactly ${money(b.amountCents)}. Wait for confirmation here before work starts.`)); }
     else box.append(el('p', 'action-note', 'Instructions refresh automatically. Wait for an IBAN before adding funds.'));
+    box.append(state.deposit?.iban
+      ? portalWait({ phase: 'watching', title: 'Watching for your Monerium deposit', detail: `Send exactly ${money(b.amountCents)} to the IBAN above. We confirm it in escrow automatically.` })
+      : portalWait({ phase: 'preparing', title: 'Linking your deposit IBAN', detail: 'The escrow is getting its Monerium sandbox deposit account.' }));
   }
   if (b.canClaim) {
     if (!state.me?.payout) box.append(link('Add payout details to claim →', '/app/settings?payout=1', 'ui-button'));
@@ -434,7 +449,16 @@ async function load() {
   try {
     const result = await api('/bounties/' + id); state.offline = false;
     const signature = JSON.stringify(result.bounty);
-    if (signature !== state.last) { state.bounty = result.bounty; state.last = signature; restoreFunding(); render(); validateCheck(result.bounty); }
+    if (signature !== state.last) {
+      const wasWaiting = state.bounty?.id === result.bounty.id && awaitingFunding(state.bounty);
+      state.bounty = result.bounty; state.last = signature; restoreFunding();
+      if (wasWaiting && result.bounty.task?.funded && result.bounty.role === 'client') { state.celebrateAt = Date.now(); setTimeout(() => { if (state.celebrateAt && Date.now() - state.celebrateAt >= CELEBRATION_MS) { state.celebrateAt = 0; render(); } }, CELEBRATION_MS + 50); }
+      render(); validateCheck(result.bounty);
+    }
+    // While the creator waits on escrow or a deposit, refresh every ~5 s (the server bounds the work).
+    const waiting = awaitingFunding();
+    if (waiting) document.documentElement.dataset.npWaiting = ''; else delete document.documentElement.dataset.npWaiting;
+    clearTimeout(state.fastTimer); if (waiting && !document.hidden) state.fastTimer = setTimeout(() => state.poller?.now(), 5000);
     if (state.bounty?.role === 'client' && (state.bounty.task?.jobId != null || state.bounty.paymentRail === 'base-usdc' && state.bounty.task?.crypto) && !state.bounty.task.funded && !(state.deposit?.iban || state.deposit?.address)) {
       try { state.deposit = await api(`/bounties/${id}/deposit`); state.depositError = ''; render(); } catch (error) { state.depositError = error.message; render(); }
     }
@@ -449,7 +473,7 @@ else {
   try { state.me = await api('/me'); } catch { state.me = null; }
   renderIdentity(); await load();
   // Detail refresh every ~10 s (jittered, paused in hidden tabs, backing off on errors).
-  const poller = poll(load, { interval: 10000, focus: false });
+  const poller = poll(load, { interval: 10000, focus: false }); state.poller = poller;
   // Returning from Settings (focus, tab switch or back navigation) re-reads /me so Monerium and refund prerequisites are current.
   let focusCheckedAt = Date.now();
   const refreshMe = async () => {
@@ -502,14 +526,17 @@ function renderCryptoReward() {
   else if(receipts.length>1){const details=el('details','deposit-receipts');details.append(el('summary','',`Verify ${receipts.length} deposits`));receipts.forEach((r,i)=>details.append(link(`Deposit ${i+1} ↗`,r.href,'ui-link')));box.append(details);}
   else box.append(el('p','action-note','Retrieving deposit receipt…'));
  }
+ const celebrate=celebrationMark(b); if(celebrate) box.append(celebrate);
  if(b.role==='client'&&b.status==='Draft') {
    consent(box,'I accept this fixed USDC reward and automatic payment after a verified qualifying merge. Surplus deposits have no automatic refund in this test.' + (b.market ? ` I get an exclusive assignment with ${deliveryText(b.market.deliveryHours)} to submit, starting when it is confirmed.` : ''),state.consent===b.revision,value=>{state.consent=value?b.revision:'';});
-   box.append(button('Accept & create deposit address',()=>action('publish',{revision:b.revision}),'ui-button',state.consent!==b.revision||!state.me?.cryptoPaymentsReady||state.checkMismatch));
+   if(state.busyAction==='publish')box.append(portalWait({phase:'busy',title:'Creating your deposit address',detail:'Publishing the brief and preparing a dedicated Base Sepolia address.',note:'This takes a few seconds'}));
+   box.append(button(state.busy?'Setting up…':'Accept & create deposit address',()=>action('publish',{revision:b.revision}),'ui-button',state.consent!==b.revision||!state.me?.cryptoPaymentsReady||state.checkMismatch));
    if(!state.me?.cryptoPaymentsReady)box.append(el('p','action-note','USDC test payments are being configured. Your draft can be saved; do not send funds yet.'));
  } else if(b.role==='client' && t && !t.funded) {
    if(state.deposit?.address){box.append(el('strong','','Send exactly '+money(b.amountCents)),copyRow(state.deposit.address, 'Copy address'),el('p','action-note','USDC token: '+state.deposit.token),el('p','action-note','Network: Base Sepolia (84532). Wait for on-chain confirmations before claims open.'));
-   } else box.append(el('p','action-note','Preparing and verifying the dedicated deposit address…'));
-   if(t.crypto?.depositedUnits)box.append(el('p','action-note','Confirmed deposit: '+(Number(t.crypto.depositedUnits)/1e6).toFixed(6)+' USDC'));
+    box.append(portalWait({phase:'watching',title:'Watching Base Sepolia for your deposit',detail:'Once it has 12 confirmations, it is recorded in the NEAR escrow — usually within a couple of minutes.'}));
+   } else box.append(portalWait({phase:'preparing',title:'Preparing your deposit address',detail:'Creating and verifying a dedicated Base Sepolia address for this bounty.'}));
+   if(t.crypto?.depositedUnits && BigInt(t.crypto.depositedUnits)>0n)box.append(el('p','action-note','Confirmed deposit: '+(Number(t.crypto.depositedUnits)/1e6).toFixed(6)+' USDC'));
  }
  if(t?.crypto?.surplusUnits && BigInt(t.crypto.surplusUnits)>0n)box.append(el('p','action-note','Surplus held separately: '+(Number(t.crypto.surplusUnits)/1e6).toFixed(6)+' USDC. Manual review; no automatic refund.'));
  renderClaimGate(box);
