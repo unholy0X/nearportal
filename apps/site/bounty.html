@@ -1,0 +1,36 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#fff7ff"><meta name="robots" content="noindex"><title>Bounty details — NearPortal</title><link rel="icon" href="/public/brand/favicon.ico"><link rel="stylesheet" href="/workspace-fonts.css"><link rel="stylesheet" href="/workspace.css"><link rel="stylesheet" href="/deadline.css"><link rel="stylesheet" href="/bounty.css"><script type="module" src="/bounty.js"></script></head>
+<body class="ui-app task-sheet"><a class="ui-skip" href="#detail-main">Skip to bounty details</a><header id="app-header"></header>
+<main class="ui-page" id="detail-main">
+<div id="detail-error" class="ui-alert detail-error" role="alert" hidden></div>
+<section class="detail-loading" id="loading" aria-live="polite"><h1 id="loading-title">Loading bounty…</h1><p id="loading-copy">Reading the agreement, escrow state and activity.</p><a class="ui-button" id="loading-login" href="/auth/github" hidden>Sign in with GitHub</a></section>
+<div id="bounty-content" hidden>
+<a class="ui-back" id="back-link" href="/app/bounties" data-icon="back">My bounties</a>
+<div class="detail-hero"><div><h1 id="bounty-title"></h1><p class="hero-meta"><span class="repo-line" id="repo-line"><span id="repository-name"></span><code id="bounty-code"></code><span id="access-tag"></span></span><span id="hero-badges"></span></p></div><a class="ui-button ui-button-secondary hero-edit" id="edit-draft" href="/app/new" data-icon="pencil" hidden>Edit draft</a></div>
+<div id="delivery-window"></div><section id="bounty-flow" class="journey" aria-label="Bounty progress"></section>
+<div class="detail-columns"><div class="detail-content">
+
+<section class="issue-card" id="next-step-message" aria-live="polite" hidden></section>
+<div id="check-warning" class="ui-alert detail-error" role="status" hidden></div>
+<section class="task-brief" aria-labelledby="brief-heading"><h2 id="brief-heading">Brief</h2><p class="brief-description" id="brief-description"></p>
+<h2 class="criteria-title">Acceptance criteria</h2><ol id="criteria-list" class="detail-criteria"></ol></section>
+<section class="detail-card submission-card" id="submission-section" aria-labelledby="submission-heading" hidden><h2 id="submission-heading">Pull request</h2><div id="submission-content"></div></section>
+<details class="detail-card detail-more" id="verification-section"><summary><h2>Verification details</h2></summary><div class="verification-body">
+<dl class="verify-facts"><div><dt>Required check</dt><dd id="check-name"></dd></div><div><dt>Target branch</dt><dd id="target-branch"></dd></div><div><dt>Client merge</dt><dd id="client-merger"></dd></div></dl>
+<ul class="agreement-list"><li><strong>Exact commit</strong><p id="agreement-check"></p></li><li><strong>Release condition</strong><p id="agreement-owner"></p></li></ul>
+<dl class="technical-facts" id="technical-facts"></dl><p class="created-by" id="created-by"></p>
+<section class="access-box" id="access-section"></section>
+<button class="dispute-link" id="dispute-button" type="button" hidden>Pause release and raise a dispute</button>
+</div></details>
+<details class="detail-card detail-more" id="activity-section"><summary><h2>Activity</h2><span class="ui-tag" id="activity-count"></span></summary><ol class="activity-list" id="activity-list"></ol></details>
+</div>
+<aside class="funding-aside" aria-label="Reward and next action">
+<section class="reward-panel-detail" aria-labelledby="reward-label"><div class="reward-top"><div><p class="reward-heading" id="reward-label">Reward</p><div class="reward-value" id="reward-amount"></div></div><div class="reward-mascot" aria-hidden="true"><img src="/public/brand/guide.png" alt="" width="64" height="64"></div></div><div id="funding-pill" class="funding-state"><span data-icon="shield" aria-hidden="true"></span><span id="funding-label">Not funded</span></div><div id="reward-content"></div><p class="release-note"><span data-icon="coins" aria-hidden="true"></span><span>Paid after passing checks and client merge.</span></p></section>
+
+</aside>
+</div>
+<footer class="ui-footer"><span id="identity-label">Testnet</span><span class="status-live"><span class="status-dot" aria-hidden="true"></span><span id="live-label">Live</span></span><a class="ui-link" href="/app/settings">Payout settings</a></footer>
+</div>
+</main>
+<div class="toast" id="toast" role="status" hidden></div>
+<noscript><p>JavaScript is required to view live escrow information.</p></noscript>
+</body></html>

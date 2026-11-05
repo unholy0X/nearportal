@@ -1,0 +1,19 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#fff7ff"><meta name="robots" content="noindex"><title>My bounties — NearPortal</title><link rel="icon" href="/public/brand/favicon.ico"><link rel="preload" href="/public/fonts/manrope.ttf" as="font" type="font/ttf" crossorigin><link rel="stylesheet" href="/workspace-fonts.css"><link rel="stylesheet" href="/workspace.css"><link rel="stylesheet" href="/deadline.css"><script type="module" src="/board.js"></script></head>
+<body class="ui-app"><a class="ui-skip" href="#board-main">Skip to content</a><header id="app-header"></header>
+<main class="ui-page" id="board-main">
+<div class="ui-page-head"><h1 id="page-title">My bounties</h1><div class="ui-page-actions"><a class="ui-button" id="primary-action" href="/app/new"></a></div></div>
+<div class="ui-toolbar" id="toolbar">
+<div class="ui-segmented" role="group" aria-label="View"><button id="board-button" type="button" aria-pressed="true"></button><button id="list-button" type="button" aria-pressed="false"></button></div>
+<div class="ui-select"><label for="repository-filter" class="ui-visually-hidden">Filter by repository</label><select id="repository-filter"><option value="">All repositories</option></select></div>
+<div class="ui-search"><label for="search" class="ui-visually-hidden" id="search-label">Search bounties</label><input type="search" id="search" placeholder="Search bounties" autocomplete="off"><button class="ui-search-clear" id="clear-search" type="button" aria-label="Clear search" hidden></button></div>
+</div>
+<ul class="ui-summary" id="summary" aria-label="Summary" hidden></ul>
+<div class="ui-alert" id="load-error" role="alert" hidden><span id="load-error-copy">Could not load bounties.</span><button type="button" id="retry">Retry</button></div>
+<p class="ui-visually-hidden" id="result-announcement" role="status" aria-live="polite"></p>
+<div class="ui-loading-row" id="loading" aria-label="Loading"><div class="ui-skeleton"></div><div class="ui-skeleton"></div><div class="ui-skeleton"></div><div class="ui-skeleton"></div></div>
+<div class="ui-empty" id="empty-state" hidden></div>
+<div class="ui-segmented ui-column-tabs" id="column-tabs" role="tablist" aria-label="Board column" hidden></div>
+<div class="ui-board" id="board-view" hidden></div>
+<div class="ui-table-wrap" id="list-view" hidden><table class="ui-table"><caption class="ui-visually-hidden" id="table-caption">Bounties</caption><thead><tr><th scope="col">Bounty</th><th scope="col">Reward</th><th scope="col">Status</th><th scope="col">Next step</th></tr></thead><tbody id="bounty-table-body"></tbody></table></div>
+<footer class="ui-footer"><span id="environment">Sandbox · NEAR testnet · Monerium sandbox · no real funds</span><span id="update-status">Connecting…</span></footer>
+</main><noscript><p>JavaScript is required to load your bounties.</p></noscript></body></html>

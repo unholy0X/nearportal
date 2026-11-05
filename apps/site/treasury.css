@@ -1,0 +1,16 @@
+/* Demo wallet — page-specific layout on top of workspace.css. */
+.wallet-card{margin-bottom:12px}
+.wallet-label{font-size:13px;color:color-mix(in srgb,var(--ui-paper) 78%,var(--ui-violet))}
+.wallet-balance{font:750 36px/1.2 var(--ui-heading);letter-spacing:-.04em;margin:6px 0 16px;color:var(--ui-paper)}
+.wallet-facts{display:flex;flex-wrap:wrap;gap:12px 32px;margin:0 0 16px;font-size:13px}
+.wallet-facts dt{color:var(--ui-violet);margin-bottom:2px}
+.wallet-facts dd{margin:0}
+.wallet-address-row{display:flex;gap:12px;align-items:center;justify-content:space-between;padding-top:16px;border-top:1px solid var(--ui-deep-violet)}
+.wallet-address-row code{font-size:12px;overflow-wrap:anywhere;min-width:0}
+.topup-steps{padding-left:20px;margin:0 0 16px}
+.topup-steps li{margin:0 0 12px;font-size:13px;line-height:1.6}
+.topup-steps strong{display:block}
+.topup-steps p{color:var(--ui-soft)}
+.topup-steps a,.wallet-note a{color:var(--ui-deep-violet);text-decoration:underline}
+.wallet-note{font-size:12px;color:var(--ui-soft);margin-top:16px;line-height:1.6}
+@media(max-width:640px){.wallet-address-row{flex-direction:column;align-items:flex-start}.wallet-balance{font-size:30px}}

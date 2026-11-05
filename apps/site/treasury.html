@@ -1,0 +1,25 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#fff7ff"><meta name="robots" content="noindex"><title>Demo wallet — NearPortal</title><link rel="icon" href="/public/brand/favicon.ico"><link rel="stylesheet" href="/workspace-fonts.css"><link rel="stylesheet" href="/workspace.css"><link rel="stylesheet" href="/treasury.css"><script type="module" src="/treasury.js"></script></head>
+<body class="ui-app"><a class="ui-skip" href="#wallet-main">Skip to content</a><header id="app-header"></header>
+<main class="ui-page ui-page-narrow" id="wallet-main">
+<div class="ui-page-head"><div><h1 id="wallet-heading">Demo wallet</h1><p class="ui-page-sub" id="wallet-description">Loading the sandbox treasury…</p></div><div class="ui-page-actions"><button type="button" class="ui-button ui-button-secondary" id="refresh-wallet">Refresh balance</button></div></div>
+<div class="ui-alert" id="wallet-error" role="alert" hidden></div>
+<div id="wallet-content" hidden>
+<section class="ui-panel ui-panel-dark wallet-card" aria-labelledby="wallet-balance-label">
+<p class="wallet-label" id="wallet-balance-label">Balance · EURe on Base Sepolia · sandbox</p>
+<p class="wallet-balance" id="wallet-balance">—</p>
+<dl class="wallet-facts"><div><dt>Transaction fees</dt><dd id="wallet-gas">—</dd></div><div><dt>Funding limit</dt><dd id="wallet-limit">—</dd></div><div><dt>Funding</dt><dd id="funding-ready">Checking balance…</dd></div></dl>
+<div class="wallet-address-row"><code id="wallet-address"></code><button type="button" class="ui-button ui-button-small wallet-copy" id="copy-wallet">Copy address</button></div>
+</section>
+<section class="ui-panel">
+<div class="ui-panel-head"><h2>Top up once</h2></div>
+<ol class="topup-steps">
+<li><strong>Add test EURe to this wallet.</strong><p>In your client <a href="https://sandbox.monerium.dev/receive" target="_blank" rel="noopener">Monerium sandbox</a>, select the address above on Base Sepolia and add test funds. For example, €500 covers five €100 bounties. Confirm the selected wallet and routing before using Add money.</p></li>
+<li><strong>Add a little Base Sepolia test ETH.</strong><p>The wallet needs test gas to send EURe. Use a <a href="https://docs.base.org/base-chain/tools/network-faucets" target="_blank" rel="noopener">Base Sepolia faucet</a> and send the test ETH to the same address.</p></li>
+<li><strong>Fund bounties from NearPortal.</strong><p>Return to a bounty with a prepared escrow and choose “Fund from demo wallet.” The app sends the exact reward and waits for the verified deposit.</p></li>
+</ol>
+<a class="ui-button" href="/app/bounties">Open my bounties</a>
+</section>
+<p class="wallet-note">Sandbox funds only. The signing key stays encrypted on the server. Funding is limited to €100 per bounty and €500 per day. Linking this wallet does not change your Monerium IBAN; any routing change must be confirmed in Monerium.</p>
+<footer class="ui-footer"><span id="wallet-status">Base Sepolia · test funds only</span><a class="ui-link" id="wallet-explorer" target="_blank" rel="noopener">View wallet on explorer</a></footer>
+</div>
+</main></body></html>
