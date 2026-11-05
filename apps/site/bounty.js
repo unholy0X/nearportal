@@ -4,7 +4,7 @@ import { fundingProgress } from '/funding-progress.mjs';
 import { mountShell, icon as uiIcon, poll } from '/workspace-shell.mjs';
 import { bountyStatus, pullRequestUrl, editorUrl } from '/workspace-model.mjs';
 import { portalWait, portalCelebrate, CELEBRATION_MS } from '/portal-wait.mjs';
-import { bountyStage, fundingState, protectedFiles, validBountyId, explorerLinks, cryptoDepositLinks, bountyMilestones, suggestedBranch, parsePullRequest } from '/bounty-detail-model.mjs';
+import { unsubmittedPr, bountyStage, fundingState, protectedFiles, validBountyId, explorerLinks, cryptoDepositLinks, bountyMilestones, suggestedBranch, parsePullRequest } from '/bounty-detail-model.mjs';
 const $ = selector => document.querySelector(selector);
 const id = decodeURIComponent(location.pathname.split('/').filter(Boolean).at(-1));
 const state = { refreshRequestedAt: '', walletAddress: '', bounty: null, me: null, busy: false, consent: '', claimConsent: '', deposit: null, depositError: '', error: '', last: '', checkMismatch: false, checkNames: [], checkedRevision: '', pr: '', offline: false, treasury: null, treasuryLoading: false, treasuryAt: 0, treasuryConsent: '', manualBank: false, treasurySubmission: false, treasuryReadError: false, treasuryEpoch: 0 };
@@ -378,7 +378,20 @@ function renderAssignment(content, b) {
     content.append(el('p', 'read-only-notice', `The deadline passed without a submission. The assignment expires when the ${m.relayGraceMinutes}-minute relay window closes; the bounty then reopens. Funds stay in escrow.`));
     return true;
   }
-  const branch=suggestedBranch(b);if(branch)content.append(el('p','branch-copy-label','Branch name'),copyRow(branch,'Copy branch'));
+  const found = unsubmittedPr(b);
+  if (found && a.mine) {
+    // One click, still the developer's own explicit submission: it registers the PR's current commit.
+    const card = el('div', 'pr-found'); card.setAttribute('role', 'status');
+    card.append(el('strong', '', `We found PR #${found} for ${a.marker}`), el('p', '', (a.candidate.merged ? 'It is merged on GitHub, but it only counts as delivered once you submit it here. ' : 'Submit it to register its current commit as your delivery. ') + `Deadline: ${dueFormat(a.deadline)}.`));
+    card.append(button(state.busy ? 'Submitting…' : `Submit PR #${found} →`, () => action('submit', { prNumber: found, expectedRevision: m.revision }).then(ok => { if (ok) toast('Submission received. Verification follows.'); }), 'ui-button'));
+    content.append(card);
+  } else if (found) {
+    const card = el('div', 'pr-found'); card.setAttribute('role', 'status');
+    card.append(el('strong', '', `PR #${found} by @${a.login} is ready but not submitted`), el('p', '', `@${a.login} must submit it in NearPortal before ${dueFormat(a.deadline)}. ${a.candidate.merged ? 'Merging on GitHub alone does not count as delivery.' : 'Until then, the delivery deadline keeps running.'}`));
+    card.append(link(`Open PR #${found} ↗`, `https://github.com/${b.repository}/pull/${found}`, 'ui-link'));
+    content.append(card);
+  }
+  const branch=suggestedBranch(b);if(branch&&!found)content.append(el('p','branch-copy-label','Branch name'),copyRow(branch,'Copy branch'));
   if (!a.mine) { content.append(el('p', 'read-only-notice', `Exclusively assigned to @${a.login} until ${dueFormat(a.deadline)}.`)); return true; }
   content.append(el('p', '', 'Put this exact line in your pull request description:'), copyRow(`NearPortal-Task: ${a.marker}`));
   const links = el('div', 'assignment-links'); links.append(link('Open code editor ↗', editorUrl(b), 'ui-button ui-button-secondary'), link('Create PR on GitHub ↗', pullRequestUrl(b), 'ui-button ui-button-secondary')); content.append(links);

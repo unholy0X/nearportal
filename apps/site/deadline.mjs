@@ -12,7 +12,8 @@ export function deadlineState(b, now = Date.now()) {
   const seconds = Math.ceil(left / 1000), h = Math.floor(seconds / 3600), min = Math.floor(seconds % 3600 / 60), sec = seconds % 60;
   const value = [h,min,sec].map(n => String(n).padStart(2,'0')).join(':');
   const progress = total > 0 ? Math.min(1,left / total) : 0;
-  return {kind:left <= Math.min(900000,total * .25) ? 'urgent':'active', label:'Time remaining', value, note:'Exclusive delivery window', progress, deadline:a.deadline};
+  const found = Number.isSafeInteger(a.candidate?.prNumber) ? `PR #${a.candidate.prNumber} found · not submitted yet` : null;
+  return {kind:left <= Math.min(900000,total * .25) ? 'urgent':'active', label:'Time remaining', value, note:found || 'Exclusive delivery window', progress, deadline:a.deadline};
 }
 export function duration(hours) { return hours % 24 ? `${hours} hour${hours === 1 ? '' : 's'}` : `${hours / 24} day${hours === 24 ? '' : 's'}`; }
 const clockOffsets = new WeakMap();

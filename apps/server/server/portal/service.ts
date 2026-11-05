@@ -15,6 +15,7 @@ import {
   canAutoMerge,
   canApproveJudgeRun,
 } from "./judge.ts";
+import { findCandidate, withCandidate } from "./submission-candidate.ts";
 
 /** Origin users open; hosted deployments must set it (validated at startup), local falls back. */
 export function publicOrigin() {
@@ -84,7 +85,7 @@ export class PortalService {
       status: this.publicState(b, t),
       task,
       summary: true as const,
-      market: this.fixed?.view(b, u?.id) ?? null,
+      market: this.marketView(b, u),
       repositoryAccess: !b.private || participant || verifiedMember,
       client: { id: b.ownerId, login: b.owner },
       role: b.ownerId === u?.id ? "client" : t?.policy.developerId === u?.id ? "developer" : "visitor",
@@ -135,7 +136,7 @@ export class PortalService {
       revision: hash(b),
       status: state,
       task,
-      market: this.fixed?.view(b, u?.id) ?? null,
+      market: this.marketView(b, u),
       repositoryAccess: !b.private || participant || verifiedMember,
       accessRequest: u
         ? (this.store.accessRequests(b.id).find((r) => r.userId === u.id) ??
@@ -354,6 +355,26 @@ export class PortalService {
     if (owned) return owned === b.error;
     return owned === undefined && !this.store.hasJob(b.id);
   }
+  /** Deadline view plus the unsubmitted-PR hint for the creator and the assignee (display only). */
+  private marketView(b: Bounty, u?: User | null) {
+    return withCandidate(this.fixed?.view(b, u?.id) ?? null, b.ownerId, u?.id, this.store.meta(`candidate:${b.id}`));
+  }
+  private async scanSubmissionCandidate(b: Bounty, t: import("../tasks/domain.ts").Task) {
+    const a = this.fixed?.view(b)?.assignment, key = `candidate:${b.id}`;
+    if (!a?.confirmed || a.submission || a.acceptedAt == null) { if (this.store.meta(key)) this.store.meta(key, ""); return; }
+    const stampKey = `candidate-scan:${b.id}`;
+    if (Date.now() - Number(this.store.meta(stampKey) ?? 0) < 30_000) return;
+    this.store.meta(stampKey, String(Date.now()));
+    try {
+      // Same cached, ETag-revalidated list request as open-bounty discovery.
+      const prs = await this.userGit(b.ownerId).get<any[]>(
+        `/repos/${b.repository}/pulls?state=all&sort=updated&direction=desc&per_page=100`,
+        { maxAgeMs: this.discoveryCacheMs },
+      );
+      const found = findCandidate(prs, a, t.policy.branch);
+      this.store.meta(key, found ? JSON.stringify(found) : "");
+    } catch { /* a display hint only; the explicit submission path is unaffected */ }
+  }
   async tick() {
     if (this.running) return;
     this.running = true;
@@ -548,6 +569,7 @@ export class PortalService {
           });
           this.store.enqueue(b, "issue");
         }
+        if (t.policy.market && t.funded && !t.disputed && t.payment.state === "NotRequested") await this.scanSubmissionCandidate(b, t);
         if (
           !t.funded ||
           !t.policy.developerId ||

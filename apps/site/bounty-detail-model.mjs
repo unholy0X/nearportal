@@ -28,6 +28,11 @@ export function explorerLinks(reference, txHash) {
     tx: /^[1-9A-HJ-NP-Za-km-z]{43,44}$/.test(txHash || '') ? `${base}/txns/${txHash}` : null,
   };
 }
+/** Deadline bounties: a PR with the assignment marker that the developer has not submitted yet (display only). */
+export function unsubmittedPr(bounty) {
+  const a = bounty?.market?.assignment;
+  return a && !a.submission && !bounty.task?.prNumber && Number.isSafeInteger(a.candidate?.prNumber) ? a.candidate.prNumber : null;
+}
 /** The five journey stops with factual sub-labels. `state` is done | current | todo; `alert` marks a blocked current stop. */
 export function journeySteps(bounty, { attention = false } = {}) {
   const t = bounty.task, pay = t?.payment?.state, current = bountyStage(bounty);
@@ -35,7 +40,7 @@ export function journeySteps(bounty, { attention = false } = {}) {
   const notes = [
     t?.funded ? 'Funds secured' : bounty.status === 'Draft' ? 'Draft · not funded' : t?.jobId != null ? 'Awaiting deposit' : 'Preparing escrow',
     dev || (t?.funded ? 'Open to claim' : 'After funding'),
-    t?.prNumber ? `PR #${t.prNumber}${t.verdict?.status === 'blocked' ? ' · blocked' : t.verdict?.status === 'eligible' || pay && pay !== 'NotRequested' ? ' · verified' : ''}` : 'Waiting for PR',
+    t?.prNumber ? `PR #${t.prNumber}${t.verdict?.status === 'blocked' ? ' · blocked' : t.verdict?.status === 'eligible' || pay && pay !== 'NotRequested' ? ' · verified' : ''}` : unsubmittedPr(bounty) ? `PR #${unsubmittedPr(bounty)} found · not submitted` : 'Waiting for PR',
     pay === 'Processed' ? 'Released' : pay === 'NeedsAttention' ? 'Needs attention' : t?.disputed ? 'Paused' : pay && pay !== 'NotRequested' ? 'Processing' : 'After merge',
     pay === 'Processed' ? 'Payment confirmed' : 'Receipt pending',
   ];
@@ -71,7 +76,7 @@ export function bountyMilestones(b) {
  return [
  {label:'Funded',done:Boolean(t?.funded),detail:t?.funded?'Funds secured':'Awaiting deposit'},
  {label:'Claimed',done:assigned,detail:assigned?'@'+t.policy.developerLogin:'Open to claim'},
- {label:'Checks',done:Boolean(checks),detail:checks?'Verified':t?.verdict?.status==='blocked'?'Needs attention':t?.prNumber?'Verification pending':'Waiting for PR'},
+ {label:'Checks',done:Boolean(checks),detail:checks?'Verified':t?.verdict?.status==='blocked'?'Needs attention':t?.prNumber?'Verification pending':unsubmittedPr(b)?`PR #${unsubmittedPr(b)} found · not submitted`:'Waiting for PR'},
  {label:'Merged',done:merged,detail:merged?'Merge recorded':'Awaiting client'},
  {label:'Paid',done:paid,detail:paid?'Payment confirmed':t?.payment?.state==='NeedsAttention'?'Needs attention':processing?'Processing':'Not released'},
  ];
