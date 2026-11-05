@@ -13,6 +13,7 @@
     "sandbox:smoke": "node --import tsx scripts/sandbox-smoke.ts",
     "sandbox:bank": "node --import tsx scripts/sandbox-bank.ts",
     "sandbox:start": "ENV_FILE=.env.sandbox node --import tsx server/tasks.ts",
+    "test": "sh scripts/isolated.sh node --import ./test/loopback-only.mjs --import tsx --test --test-timeout=60000 test/*.test.ts",
     "dev": "node scripts/dev.mjs",
     "web": "vite",
     "build": "vite build",
