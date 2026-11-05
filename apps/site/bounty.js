@@ -43,13 +43,39 @@ async function publishBankBounty() {
   if (await action('publish', { revision: state.bounty.revision })) return;
   try { const me = await api('/me'); if (me.user?.id === state.me?.user?.id) { state.me = me; render(); } } catch { /* Keep the visible error; the next focus retries. */ }
 }
-/** Celebrate once when funding is confirmed while this page is open. */
-function celebrationMark(b) {
-  if (!(state.celebrateAt && Date.now() - state.celebrateAt < CELEBRATION_MS && b.task?.funded)) return null;
-  return portalCelebrate({ startedAt: state.celebrateAt, title: 'Funds secured!', detail: b.paymentRail === 'base-usdc' ? 'Your USDC is confirmed and recorded in the NEAR escrow. Contributors can claim it now.' : 'Your deposit is confirmed in escrow. Contributors can claim it now.' });
-}
-/** True while the creator is waiting on escrow setup or a deposit; drives the animation and faster refresh. */
+const PAYMENT_IN_FLIGHT = ['Authorized', 'Signing', 'Signed', 'Submitted'];
+/** True while an authorized payout is being signed and settled; shown to the creator and the contributor. */
+function paymentInFlight(b = state.bounty) { return Boolean(b && ['client', 'developer'].includes(b.role) && PAYMENT_IN_FLIGHT.includes(b.task?.payment?.state) && !b.task?.disputed); }
+/** True while the creator is waiting on escrow setup or a deposit. */
 function awaitingFunding(b = state.bounty) { return Boolean(b && b.role === 'client' && b.status !== 'Draft' && !b.error && !b.task?.funded && !b.task?.disputed && !b.task?.refund); }
+function pageWaiting(b = state.bounty) { return awaitingFunding(b) || paymentInFlight(b); }
+/** A one-time celebration when funding or payment is confirmed while this page is open. */
+function celebrate(kind) {
+  state.celebration = { kind, at: Date.now() };
+  setTimeout(() => { if (state.celebration && Date.now() - state.celebration.at >= CELEBRATION_MS) { state.celebration = null; render(); } }, CELEBRATION_MS + 50);
+}
+function celebrationMark(b) {
+  const c = state.celebration;
+  if (!c || Date.now() - c.at >= CELEBRATION_MS) return null;
+  const usdc = b.paymentRail === 'base-usdc';
+  if (c.kind === 'funded' && b.task?.funded) return portalCelebrate({ startedAt: c.at, title: 'Funds secured!', detail: usdc ? 'Your USDC is confirmed and recorded in the NEAR escrow. Contributors can claim it now.' : 'Your deposit is confirmed in escrow. Contributors can claim it now.' });
+  if (c.kind === 'paid' && b.task?.payment?.state === 'Processed') {
+    const mine = b.role === 'developer';
+    return portalCelebrate({ startedAt: c.at, title: mine ? 'You’ve been paid!' : 'Paid!', detail: usdc
+      ? (mine ? `${money(b.amountCents)} was sent to your wallet and confirmed on Base Sepolia.` : `${money(b.amountCents)} was sent to @${b.task.policy?.developerLogin} and confirmed on Base Sepolia.`)
+      : (mine ? `Monerium confirmed your ${money(b.amountCents)} payout. The escrow is closed.` : `Monerium confirmed the ${money(b.amountCents)} payout to @${b.task.policy?.developerLogin}. The escrow is closed.`) });
+  }
+  return null;
+}
+/** The payout in flight, phrased for the current rail. */
+function paymentMark(b) {
+  if (!paymentInFlight(b)) return null;
+  const st = b.task.payment.state, usdc = b.paymentRail === 'base-usdc';
+  const detail = usdc
+    ? (st === 'Submitted' ? 'The USDC transfer is on Base Sepolia, waiting for confirmations.' : 'Authorized on NEAR. The MPC network is signing the USDC transfer on Base Sepolia.')
+    : (st === 'Submitted' ? 'The transfer is with Monerium. We follow it until it is confirmed.' : 'Authorized on NEAR. Waiting for the MPC signature, then Monerium processes the transfer.');
+  return portalWait({ phase: 'paying', title: b.role === 'developer' ? 'Your payout is on its way' : 'Releasing the payment', detail, note: 'Usually a couple of minutes · updates automatically' });
+}
 async function action(name, body = {}) {
   if (state.busy) return;
   state.busy = true; state.busyAction = name; state.error = ''; render();
@@ -193,6 +219,7 @@ function renderReward() {
       ? portalWait({ phase: 'watching', title: 'Watching for your Monerium deposit', detail: `Send exactly ${money(b.amountCents)} to the IBAN above. We confirm it in escrow automatically.` })
       : portalWait({ phase: 'preparing', title: 'Linking your deposit IBAN', detail: 'The escrow is getting its Monerium sandbox deposit account.' }));
   }
+  const paying = paymentMark(b); if (paying) box.append(paying);
   if (b.canClaim) {
     if (!state.me?.payout) box.append(link('Add payout details to claim →', '/app/settings?payout=1', 'ui-button'));
     else { consent(box, `I accept the fixed criteria and payout to ${state.me.payout.iban}. My PR must pass the agreed check and be merged by @${b.owner}.` + (b.market ? ` I get an exclusive assignment with ${deliveryText(b.market.deliveryHours)} to submit, starting when it is confirmed.` : ''), state.claimConsent === t?.policyHash, value => { state.claimConsent = value ? t.policyHash : ''; }); box.append(button('Claim this bounty →', () => action('claim', { policyHash: t.policyHash, payoutVersion: state.me.payout.version }), 'ui-button', state.claimConsent !== t.policyHash)); }
@@ -450,13 +477,14 @@ async function load() {
     const result = await api('/bounties/' + id); state.offline = false;
     const signature = JSON.stringify(result.bounty);
     if (signature !== state.last) {
-      const wasWaiting = state.bounty?.id === result.bounty.id && awaitingFunding(state.bounty);
+      const same = state.bounty?.id === result.bounty.id, wasFunding = same && awaitingFunding(state.bounty), wasPaying = same && paymentInFlight(state.bounty);
       state.bounty = result.bounty; state.last = signature; restoreFunding();
-      if (wasWaiting && result.bounty.task?.funded && result.bounty.role === 'client') { state.celebrateAt = Date.now(); setTimeout(() => { if (state.celebrateAt && Date.now() - state.celebrateAt >= CELEBRATION_MS) { state.celebrateAt = 0; render(); } }, CELEBRATION_MS + 50); }
+      if (wasPaying && result.bounty.task?.payment?.state === 'Processed') celebrate('paid');
+      else if (wasFunding && result.bounty.task?.funded) celebrate('funded');
       render(); validateCheck(result.bounty);
     }
-    // While the creator waits on escrow or a deposit, refresh every ~5 s (the server bounds the work).
-    const waiting = awaitingFunding();
+    // While escrow, a deposit or a payout is pending, refresh every ~5 s (the server bounds the work).
+    const waiting = pageWaiting();
     if (waiting) document.documentElement.dataset.npWaiting = ''; else delete document.documentElement.dataset.npWaiting;
     clearTimeout(state.fastTimer); if (waiting && !document.hidden) state.fastTimer = setTimeout(() => state.poller?.now(), 5000);
     if (state.bounty?.role === 'client' && (state.bounty.task?.jobId != null || state.bounty.paymentRail === 'base-usdc' && state.bounty.task?.crypto) && !state.bounty.task.funded && !(state.deposit?.iban || state.deposit?.address)) {
@@ -539,6 +567,7 @@ function renderCryptoReward() {
    if(t.crypto?.depositedUnits && BigInt(t.crypto.depositedUnits)>0n)box.append(el('p','action-note','Confirmed deposit: '+(Number(t.crypto.depositedUnits)/1e6).toFixed(6)+' USDC'));
  }
  if(t?.crypto?.surplusUnits && BigInt(t.crypto.surplusUnits)>0n)box.append(el('p','action-note','Surplus held separately: '+(Number(t.crypto.surplusUnits)/1e6).toFixed(6)+' USDC. Manual review; no automatic refund.'));
+ const paying=paymentMark(b); if(paying) box.append(paying);
  renderClaimGate(box);
  if(b.canClaim) {
   box.append(el('h3','claim-heading','Claim this bounty'));

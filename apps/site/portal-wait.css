@@ -21,6 +21,27 @@
 .portal-wait.is-preparing .portal-wait-shadow,.portal-wait.is-busy .portal-wait-shadow{animation-name:np-shadow-build;animation-duration:2.4s}
 .portal-wait.is-busy .portal-wait-ring{animation-duration:1.2s}
 
+/* Paying: the cat hops excitedly through the portal with the reward. */
+.portal-wait.is-paying{background:linear-gradient(120deg,color-mix(in srgb,var(--ui-violet) 10%,var(--ui-paper)),color-mix(in srgb,var(--ui-apricot) 10%,var(--ui-paper)))}
+.portal-wait.is-paying .portal-wait-cat{animation-name:np-cat-pay;animation-duration:2.4s}
+.portal-wait.is-paying .portal-wait-shadow{animation-name:np-shadow-pay;animation-duration:2.4s}
+.portal-wait.is-paying .portal-wait-ring{animation-duration:1.6s}
+.portal-wait.is-paying .portal-wait-spark-1,.portal-wait.is-paying .portal-wait-spark-2{animation-duration:1.2s}
+@keyframes np-cat-pay{
+  0%{translate:0 0;rotate:0deg;scale:1 1}
+  100%{translate:0 0;rotate:360deg;scale:1 1}
+  6%{translate:0 2px;scale:1.12 .86}
+  16%{translate:0 -14px;rotate:-8deg;scale:.94 1.08}
+  26%{translate:0 0;rotate:0deg;scale:1.1 .88}
+  32%{translate:0 2px;scale:1.12 .86}
+  44%{translate:0 -20px;rotate:180deg;scale:.94 1.08}
+  56%{translate:0 0;rotate:360deg;scale:1.12 .86}
+  64%{translate:0 0;rotate:360deg;scale:1 1}
+  78%{translate:3px 0;rotate:368deg}
+  90%{translate:-3px 0;rotate:352deg}
+}
+@keyframes np-shadow-pay{0%,26%,56%,64%,100%{scale:1;opacity:1}16%{scale:.62;opacity:.5}44%{scale:.45;opacity:.4}}
+
 /* Celebration: a spin-hop out of the portal and a burst of ribbon sparks, once. */
 .portal-wait.is-celebrating{background:linear-gradient(120deg,color-mix(in srgb,var(--ui-pink) 14%,var(--ui-paper)),color-mix(in srgb,var(--ui-apricot) 14%,var(--ui-paper)));border-color:color-mix(in srgb,var(--ui-pink) 40%,transparent)}
 .portal-wait.is-celebrating .portal-wait-cat{animation:np-cat-celebrate 1.5s cubic-bezier(.3,1.4,.5,1) both}
