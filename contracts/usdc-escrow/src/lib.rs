@@ -162,3 +162,6 @@ fn is_valid_bounty_id(id: &str) -> bool {
 fn is_payable_address(address: &str, escrow: &str) -> bool {
     evm::is_evm_address(address) && address != escrow && address != evm::USDC_TOKEN
 }
+
+#[cfg(test)]
+mod tests;
