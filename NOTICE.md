@@ -14,5 +14,5 @@ Their notices accompany the files in each `public/fonts` directory. NearPortal's
 name and branding are not a grant of trademark rights. Brand assets were supplied
 by the project owner or produced with AI image tools for this project.
 
-Claude Code and OpenAI Codex assisted with code, tests, documentation and review.
-The maintainers are responsible for the resulting implementation and deployment.
+Parts of the code and documentation were written with AI coding assistants and reviewed by
+the maintainer, who is responsible for the resulting implementation and deployment.
