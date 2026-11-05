@@ -69,7 +69,7 @@ impl Contract {
         head_sha: String,
         observed_at_ns: U64,
     ) {
-        self.roles.assert_not_paused();
+        // Recording evidence moves no funds and remains available during a financial pause.
         let mut b = self.bounty(bounty_id.0);
         Self::assert_verifier(&b);
         require!(

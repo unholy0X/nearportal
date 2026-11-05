@@ -83,6 +83,26 @@ impl Contract {
         U64(id)
     }
 
+    /// Retry a transient MPC failure using the same immutable path and expected address.
+    pub fn retry_address_check(&mut self, bounty_id: U64) {
+        let b = self.bounty(bounty_id.0);
+        let caller = env::predecessor_account_id();
+        require!(
+            caller == b.client || caller == b.verifier,
+            errors::ONLY_CLIENT_OR_VERIFIER
+        );
+        require!(
+            b.state == BountyState::VerifyingAddress,
+            errors::ADDRESS_ALREADY_VERIFIED
+        );
+        mpc::require_gas_for_derivation();
+        let _ = mpc::derived_public_key(&self.mpc_contract, &b.escrow_path).then(
+            Self::ext(env::current_account_id())
+                .with_static_gas(mpc::GAS_FOR_CALLBACK)
+                .on_escrow_address_checked(bounty_id),
+        );
+    }
+
     /// MPC callback of `create_bounty`. Never panics.
     #[private]
     pub fn on_escrow_address_checked(&mut self, bounty_id: U64) {
@@ -101,7 +121,9 @@ impl Contract {
                 json!({ "bounty_id": bounty_id, "escrow_evm_address": b.escrow_evm_address }),
             );
         } else {
-            b.state = BountyState::Cancelled;
+            if derived.is_some() {
+                b.state = BountyState::Cancelled;
+            }
             emit(
                 RAIL,
                 Event::EscrowAddressRejected,
@@ -315,38 +337,45 @@ impl Contract {
         self.bounties.insert(bounty_id.0, b);
     }
 
-    /// Owner decision. `Payout` pays the reward to the active assignment's recipient (the
-    /// bounty must be fully funded); `Refund` returns the whole uncommitted deposit to the
-    /// refund IBAN fixed at creation. Either outcome is the bounty's single settlement.
-    pub fn resolve_dispute(&mut self, bounty_id: U64, outcome: DisputeOutcome) -> U64 {
+    /// Resume the original agreement without authorizing a developer payment, or refund
+    /// every uncommitted deposit to the refund IBAN fixed at creation.
+    pub fn resolve_dispute(&mut self, bounty_id: U64, outcome: DisputeOutcome) -> Option<U64> {
         self.roles.assert_owner();
         self.roles.assert_not_paused();
         let mut b = self.bounty(bounty_id.0);
         require!(b.state == BountyState::Disputed, errors::NO_OPEN_DISPUTE);
-        let (kind, amount, destination) = match outcome {
-            DisputeOutcome::Payout => {
-                let a = b
-                    .assignment
-                    .as_ref()
-                    .unwrap_or_else(|| env::panic_str(errors::NO_ACTIVE_ASSIGNMENT));
-                (PayoutKind::Developer, b.reward_cents.0, a.recipient.clone())
+        let payout = match outcome {
+            DisputeOutcome::Resume => {
+                b.state = if b.deposited_cents.0 >= b.reward_cents.0 {
+                    BountyState::Funded
+                } else {
+                    BountyState::AwaitingDeposit
+                };
+                None
             }
-            DisputeOutcome::Refund => (
-                PayoutKind::Refund,
-                b.uncommitted_cents(),
-                b.refund_short_iban.clone(),
-            ),
+            DisputeOutcome::Refund => {
+                let amount = b.uncommitted_cents();
+                let destination = b.refund_short_iban.clone();
+                let id = self.schedule_payout(
+                    bounty_id.0,
+                    &mut b,
+                    PayoutKind::Refund,
+                    amount,
+                    destination,
+                    true,
+                );
+                b.settlement_payout_id = Some(U64(id));
+                Self::close(bounty_id.0, &mut b);
+                Some(U64(id))
+            }
         };
-        let payout = self.schedule_payout(bounty_id.0, &mut b, kind, amount, destination, true);
-        b.settlement_payout_id = Some(U64(payout));
         emit(
             RAIL,
             Event::DisputeResolved,
-            json!({ "bounty_id": bounty_id, "outcome": outcome, "payout_id": U64(payout) }),
+            json!({ "bounty_id": bounty_id, "outcome": outcome, "payout_id": payout }),
         );
-        Self::close(bounty_id.0, &mut b);
         self.bounties.insert(bounty_id.0, b);
-        U64(payout)
+        payout
     }
 
     pub fn get_bounty(&self, bounty_id: U64) -> Option<Bounty> {

@@ -164,13 +164,23 @@ fn wrong_escrow_address_cancels_the_bounty() {
 }
 
 #[test]
-fn failed_derivation_cancels_the_bounty() {
+fn transient_derivation_failure_is_retryable() {
     let mut c = contract();
     set("client.testnet", T0);
     let id = c.create_bounty(new_bounty(None));
     with_result(T0, PromiseResult::Failed);
     c.on_escrow_address_checked(id);
-    assert_eq!(c.get_bounty(id).unwrap().state, BountyState::Cancelled);
+    assert_eq!(
+        c.get_bounty(id).unwrap().state,
+        BountyState::VerifyingAddress
+    );
+    set("client.testnet", T0 + SEC);
+    c.retry_address_check(id);
+    verify_address(&mut c, id);
+    assert_eq!(
+        c.get_bounty(id).unwrap().state,
+        BountyState::AwaitingDeposit
+    );
 }
 
 #[test]

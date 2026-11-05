@@ -129,12 +129,14 @@ fn pause_blocks_assignment() {
 }
 
 #[test]
-#[should_panic(expected = "Contract is paused")]
-fn pause_blocks_submission() {
+fn pause_allows_timely_submission_without_authorizing_payment() {
     let mut c = funded(None);
     assign(&mut c, 1, RECIPIENT, T0 + 2 * SEC);
     pause(&mut c, T0 + 2 * SEC);
     submit(&mut c, 1, T0 + 3 * SEC, T0 + 3 * SEC);
+    let b = c.get_bounty(ID.into()).unwrap();
+    assert_eq!(b.assignment.unwrap().head_sha.as_deref(), Some(HEAD));
+    assert!(b.payout.is_none());
 }
 
 #[test]

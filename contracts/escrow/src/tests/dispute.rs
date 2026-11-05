@@ -45,18 +45,20 @@ fn partially_funded_bounty_can_be_disputed_and_refunded() {
     set("client.testnet", T0 + 2 * SEC);
     c.open_dispute(id);
     set("owner.testnet", T0 + 2 * SEC);
-    let p = c.resolve_dispute(id, DisputeOutcome::Refund);
+    let p = c.resolve_dispute(id, DisputeOutcome::Refund).unwrap();
     assert_eq!(c.get_payout(p).unwrap().amount_cents, U64(30_000));
 }
 
 #[test]
-#[should_panic(expected = "No active assignment")]
-fn dispute_payout_requires_an_active_assignment() {
+fn resuming_without_assignment_does_not_authorize_a_payout() {
     let (mut c, id) = funded(None);
     set("client.testnet", T0 + 2 * SEC);
     c.open_dispute(id);
     set("owner.testnet", T0 + 2 * SEC);
-    c.resolve_dispute(id, DisputeOutcome::Payout);
+    assert_eq!(c.resolve_dispute(id, DisputeOutcome::Resume), None);
+    let b = c.get_bounty(id).unwrap();
+    assert_eq!(b.state, BountyState::Funded);
+    assert!(b.settlement_payout_id.is_none());
 }
 
 #[test]

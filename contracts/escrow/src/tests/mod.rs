@@ -157,6 +157,6 @@ pub(super) fn refund_payout() -> (Contract, U64, U64, u64) {
     set("client.testnet", t);
     c.open_dispute(id);
     set("owner.testnet", t);
-    let p = c.resolve_dispute(id, DisputeOutcome::Refund);
+    let p = c.resolve_dispute(id, DisputeOutcome::Refund).unwrap();
     (c, id, p, t)
 }

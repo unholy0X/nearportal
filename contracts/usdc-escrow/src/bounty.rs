@@ -100,7 +100,7 @@ impl Contract {
         self.check_escrow_address(bounty_id);
     }
 
-    /// MPC callback. Never panics. A mismatch leaves the bounty in `VerifyingAddress`.
+    /// MPC callback. Never panics. A transient failure remains retryable; a confirmed mismatch cancels the bounty.
     #[private]
     pub fn on_escrow_address_checked(&mut self, bounty_id: String) {
         let Some(mut b) = self.bounties.get(&bounty_id).cloned() else {
@@ -119,6 +119,10 @@ impl Contract {
             );
             self.bounties.insert(bounty_id, b);
         } else {
+            if derived.is_some() {
+                b.state = BountyState::Cancelled;
+            }
+            self.bounties.insert(bounty_id.clone(), b);
             emit(
                 RAIL,
                 Event::EscrowAddressRejected,
@@ -135,7 +139,10 @@ impl Contract {
         self.roles.assert_relayer();
         let mut b = self.bounty(&bounty_id);
         require!(
-            b.state != BountyState::VerifyingAddress,
+            !matches!(
+                b.state,
+                BountyState::VerifyingAddress | BountyState::Cancelled
+            ),
             errors::ADDRESS_NOT_VERIFIED
         );
         require!(
@@ -207,9 +214,8 @@ impl Contract {
         self.bounties.insert(bounty_id, b);
     }
 
-    /// Owner decision, the bounty's single transaction. `Payout` sends the reward to the
-    /// active assignment's recipient (the bounty must be fully funded); `Refund` sends every
-    /// recorded deposit unit to `refund_address`.
+    /// Resume verification under the original agreement, or refund every recorded deposit
+    /// unit to the fixed refund address. Resume never requests an MPC signature.
     pub fn resolve_dispute(
         &mut self,
         bounty_id: String,
@@ -221,40 +227,37 @@ impl Contract {
         self.roles.assert_not_paused();
         let mut b = self.bounty(&bounty_id);
         require!(b.state == BountyState::Disputed, errors::NO_OPEN_DISPUTE);
-        let (kind, recipient, units) = match outcome {
-            DisputeOutcome::Payout => {
-                let a = b
-                    .assignment
-                    .as_ref()
-                    .unwrap_or_else(|| env::panic_str(errors::NO_ACTIVE_ASSIGNMENT));
-                require!(
-                    b.deposited_units.0 >= b.reward_units(),
-                    errors::PAYOUT_EXCEEDS_UNCOMMITTED
-                );
-                (PayoutKind::Developer, a.recipient.clone(), b.reward_units())
+        match outcome {
+            DisputeOutcome::Resume => {
+                b.state = if b.deposited_units.0 >= b.reward_units() {
+                    BountyState::Funded
+                } else {
+                    BountyState::AwaitingDeposit
+                };
             }
-            DisputeOutcome::Refund => (
-                PayoutKind::Refund,
-                b.refund_address.clone(),
-                b.deposited_units.0,
-            ),
-        };
-        Self::authorize_payout(
-            &bounty_id,
-            &mut b,
-            kind,
-            recipient,
-            units,
-            None,
-            (max_fee.0, priority_fee.0),
-        );
+            DisputeOutcome::Refund => {
+                let recipient = b.refund_address.clone();
+                let units = b.deposited_units.0;
+                Self::authorize_payout(
+                    &bounty_id,
+                    &mut b,
+                    PayoutKind::Refund,
+                    recipient,
+                    units,
+                    None,
+                    (max_fee.0, priority_fee.0),
+                );
+            }
+        }
         emit(
             RAIL,
             Event::DisputeResolved,
             json!({ "bounty_id": bounty_id, "outcome": outcome }),
         );
         self.bounties.insert(bounty_id.clone(), b);
-        self.request_payout_signature(&bounty_id, 0);
+        if outcome == DisputeOutcome::Refund {
+            self.request_payout_signature(&bounty_id, 0);
+        }
     }
 
     pub fn get_bounty(&self, bounty_id: String) -> Option<Bounty> {

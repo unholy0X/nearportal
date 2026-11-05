@@ -76,21 +76,24 @@ fn partially_funded_bounty_can_be_refunded() {
 }
 
 #[test]
-fn payout_outcome_pays_the_assigned_recipient() {
+fn resumed_dispute_still_needs_verifier_settlement() {
     let mut c = submitted(None);
     dispute(&mut c, T0 + 4 * SEC);
-    resolve(&mut c, DisputeOutcome::Payout, T0 + 5 * SEC);
+    resolve(&mut c, DisputeOutcome::Resume, T0 + 5 * SEC);
+    assert!(c.get_bounty(ID.into()).unwrap().payout.is_none());
+    settle_at(&mut c, EVIDENCE, 1_000_000_000, 1_000_000, T0 + 6 * SEC);
     let p = payout(&c);
     assert_eq!(p.kind, PayoutKind::Developer);
     assert_eq!(p.unsigned_tx, GOLDEN_UNSIGNED);
 }
 
 #[test]
-#[should_panic(expected = "No active assignment")]
-fn payout_outcome_requires_an_assignment() {
+fn resuming_without_assignment_does_not_authorize_a_payout() {
     let mut c = funded(None);
     dispute(&mut c, T0 + 2 * SEC);
-    resolve(&mut c, DisputeOutcome::Payout, T0 + 3 * SEC);
+    resolve(&mut c, DisputeOutcome::Resume, T0 + 3 * SEC);
+    assert!(c.get_bounty(ID.into()).unwrap().payout.is_none());
+    assert_eq!(c.get_bounty(ID.into()).unwrap().state, BountyState::Funded);
 }
 
 #[test]
@@ -108,7 +111,7 @@ fn dispute_cannot_be_resolved_twice() {
     let mut c = funded(None);
     dispute(&mut c, T0 + 2 * SEC);
     resolve(&mut c, DisputeOutcome::Refund, T0 + 3 * SEC);
-    resolve(&mut c, DisputeOutcome::Payout, T0 + 4 * SEC);
+    resolve(&mut c, DisputeOutcome::Resume, T0 + 4 * SEC);
 }
 
 #[test]
@@ -122,4 +125,19 @@ fn only_owner_resolves_disputes() {
         U64(1_000_000_000),
         U64(1_000_000),
     );
+}
+
+#[test]
+#[should_panic(expected = "Exact timely submission required")]
+fn resumed_dispute_cannot_pay_without_a_recorded_submission() {
+    let mut c = funded(None);
+    assign(&mut c, 1, RECIPIENT, T0 + 2 * SEC);
+    dispute(&mut c, T0 + 3 * SEC);
+    resolve(&mut c, DisputeOutcome::Resume, T0 + 4 * SEC);
+    settle_at(&mut c, EVIDENCE, 1_000_000_000, 1_000_000, T0 + 5 * SEC);
+}
+
+#[test]
+fn payout_is_not_a_supported_owner_decision() {
+    assert!(near_sdk::serde_json::from_str::<DisputeOutcome>("\"Payout\"").is_err());
 }

@@ -142,12 +142,14 @@ fn surplus_after_settlement_is_refunded_once_the_payout_is_processed() {
 }
 
 #[test]
-fn dispute_payout_pays_the_assigned_recipient() {
+fn resumed_dispute_still_needs_verifier_settlement() {
     let (mut c, id, _) = submitted();
     set("client.testnet", T0 + 4 * SEC);
     c.open_dispute(id);
     set("owner.testnet", T0 + 5 * SEC);
-    let p = c.resolve_dispute(id, DisputeOutcome::Payout);
+    assert_eq!(c.resolve_dispute(id, DisputeOutcome::Resume), None);
+    assert!(c.get_bounty(id).unwrap().settlement_payout_id.is_none());
+    let p = settle(&mut c, id, 1, HEAD, T0 + 6 * SEC);
     let payout = c.get_payout(p).unwrap();
     assert_eq!(payout.kind, PayoutKind::Developer);
     assert_eq!(payout.amount_cents, U64(REWARD));
@@ -164,4 +166,17 @@ fn verifier_cannot_settle_after_dispute_resolution() {
     set("owner.testnet", T0 + 5 * SEC);
     c.resolve_dispute(id, DisputeOutcome::Refund);
     settle(&mut c, id, 1, HEAD, T0 + 6 * SEC);
+}
+
+#[test]
+#[should_panic(expected = "Exact timely submission required")]
+fn resumed_dispute_cannot_pay_without_a_recorded_submission() {
+    let (mut c, id) = funded(None);
+    set("verifier.testnet", T0 + 2 * SEC);
+    c.assign_developer(id, 1, ASSIGNED.into(), U64(42), RECIPIENT_IBAN.into());
+    set("client.testnet", T0 + 3 * SEC);
+    c.open_dispute(id);
+    set("owner.testnet", T0 + 4 * SEC);
+    c.resolve_dispute(id, DisputeOutcome::Resume);
+    settle(&mut c, id, 1, HEAD, T0 + 5 * SEC);
 }

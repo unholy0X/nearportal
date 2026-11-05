@@ -13,12 +13,12 @@ pub mod util;
 
 use near_sdk::near;
 
-/// Owner decision that closes a disputed bounty.
+/// Owner decision on a disputed bounty. Only the verifier can authorize developer payment.
 #[near(serializers = [json])]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DisputeOutcome {
-    /// Pay the reward to the recipient of the active assignment.
-    Payout,
+    /// Reopen verification under the original agreement; does not authorize a payment.
+    Resume,
     /// Return the deposit to the client's refund destination fixed at creation.
     Refund,
 }

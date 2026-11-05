@@ -29,6 +29,8 @@ pub enum BountyState {
     Disputed,
     /// The single outgoing transaction is authorized (`payout` is set).
     Closed,
+    /// MPC confirmed a different address. Never fund this bounty.
+    Cancelled,
 }
 
 #[near(serializers = [borsh, json])]

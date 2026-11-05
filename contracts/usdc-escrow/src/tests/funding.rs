@@ -66,7 +66,7 @@ fn surplus_is_recorded_and_never_changes_the_reward() {
 }
 
 #[test]
-fn mismatched_address_stays_unverified_and_can_be_retried() {
+fn transient_derivation_failure_is_retryable() {
     let mut c = created(None, false);
     result(T0, PromiseResult::Failed);
     c.on_escrow_address_checked(ID.into());
@@ -214,4 +214,30 @@ fn invalid_mpc_path_is_refused() {
         acc("mpc.testnet"),
         "x".repeat(65),
     );
+}
+
+#[test]
+fn confirmed_address_mismatch_is_terminal() {
+    let mut c = contract();
+    set("client.testnet", T0);
+    let mut t = terms(None);
+    t.escrow_evm_address = RECIPIENT.into();
+    c.create_bounty(ID.into(), t);
+    verify(&mut c, ID, T0 + SEC);
+    assert_eq!(
+        c.get_bounty(ID.into()).unwrap().state,
+        BountyState::Cancelled
+    );
+}
+
+#[test]
+#[should_panic(expected = "Escrow address not verified")]
+fn cancelled_bounty_never_accepts_deposit_receipts() {
+    let mut c = contract();
+    set("client.testnet", T0);
+    let mut t = terms(None);
+    t.escrow_evm_address = RECIPIENT.into();
+    c.create_bounty(ID.into(), t);
+    verify(&mut c, ID, T0 + SEC);
+    deposit(&mut c, REWARD_UNITS, 1, T0 + 2 * SEC);
 }

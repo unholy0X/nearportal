@@ -97,9 +97,9 @@ impl Contract {
         self.roles.cancel_relayer_change(RAIL);
     }
 
-    /// Pausing blocks bounty creation, deposit recording, assignment, submission, settlement
+    /// Pausing blocks bounty creation, deposit recording, assignment, settlement
     /// and dispute resolution. It never blocks disputes, payout signing recovery, processed
-    /// receipts, expiry, withdrawal, unpausing or role rotation.
+    /// receipts, timely submission, expiry, withdrawal, unpausing or role rotation.
     pub fn set_paused(&mut self, paused: bool) {
         self.roles.set_paused(RAIL, paused);
     }
