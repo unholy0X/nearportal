@@ -6,5 +6,12 @@
   "engines": {
     "node": ">=22.18"
   },
-  "scripts": {}
+  "scripts": {
+    "install:all": "npm ci --prefix services/relayer && npm ci --prefix apps/server",
+    "typecheck": "npm --prefix services/relayer run typecheck && npm --prefix apps/server run typecheck",
+    "test": "npm --prefix services/relayer test && npm --prefix apps/server test && npm --prefix apps/site test",
+    "test:contracts": "sh scripts/contracts.sh test",
+    "build": "npm --prefix apps/site run build && npm --prefix apps/server run build",
+    "demo:sim": "npm --prefix apps/server run demo:sim"
+  }
 }
