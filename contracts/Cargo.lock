@@ -2126,6 +2126,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "nearportal-usdc-escrow"
+version = "0.1.0"
+dependencies = [
+ "bs58 0.5.1",
+ "hex",
+ "k256",
+ "near-sdk",
+ "nearportal-common",
+]
+
+[[package]]
 name = "nu-ansi-term"
 version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
