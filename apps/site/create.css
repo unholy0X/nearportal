@@ -543,3 +543,4 @@ input,textarea{font-size:14px}
 .summary-card .reward-input input:focus-visible,.summary-card .duration-control input:focus-visible{box-shadow:none;outline:none}
 @media(max-width:480px){.creation-main[data-step="1"] .refresh-connection{font-size:10px;max-width:160px;padding-inline:8px}.creation-main[data-step="1"] .template-actions{gap:4px}.creation-main[data-step="1"] .save-state{display:none}.creation-main[data-step="1"] .text-button{font-size:12px}}
 @media(max-width:480px){.creation-main[data-step="1"] .refresh-connection{width:110px;max-width:110px;white-space:normal;line-height:1.25}.creation-main[data-step="1"] .page-heading h1{font-size:28px}}
+.reward-panel #refund-wallet-field{margin:-8px 0 22px}

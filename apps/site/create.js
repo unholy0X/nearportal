@@ -1,4 +1,4 @@
-import { templates, freshDraft, hydrateDraft, euroCents, briefErrors, draftPayload, reconcileDraftIdentity, deliveryHours, deliveryLabel, changeDeliveryUnit } from '/bounty-model.mjs';
+import { templates, freshDraft, hydrateDraft, euroCents, briefErrors, draftPayload, validRefundAddress, REFUND_WALLET_ERROR, reconcileDraftIdentity, deliveryHours, deliveryLabel, changeDeliveryUnit } from '/bounty-model.mjs';
 import { mountShell } from '/workspace-shell.mjs';
 
 const $ = selector => document.querySelector(selector);
@@ -185,9 +185,17 @@ function validateReward() {
   catch (error) { $('#delivery-error').textContent = error.message; $('#delivery-error').hidden = false; $('#delivery-value').setAttribute('aria-invalid', 'true'); if (valid) $('#delivery-value').focus(); valid = false; }
   return valid;
 }
+/** USDC bounties need the creator's refund wallet; it sits under the payment choice on Configure. */
+function validateRefund({ focus = true } = {}) {
+  const missing = state.draft.paymentRail === 'base-usdc' && !validRefundAddress(state.draft.refundAddress);
+  $('#refund-error').hidden = !missing; $('#refund-error').textContent = missing ? REFUND_WALLET_ERROR : '';
+  $('#refund-address').setAttribute('aria-invalid', String(missing));
+  if (missing && focus) { $('#refund-address').scrollIntoView({ block: 'center' }); $('#refund-address').focus({ preventScroll: true }); }
+  return !missing;
+}
 function goForward() {
   if (state.saving) return;
-  if (state.step === 1) { if (validateBrief() && validateConnectedDefinition() && validateReward()) { setStep(3); $('#page-heading').scrollIntoView({ block: 'start' }); } }
+  if (state.step === 1) { if (validateBrief() && validateConnectedDefinition() && validateReward() && validateRefund()) { setStep(3); $('#page-heading').scrollIntoView({ block: 'start' }); } }
   else saveDraft(true);
 }
 document.querySelectorAll('[name="payment-rail"]').forEach(input => input.addEventListener('change', event => { state.draft.paymentRail = event.target.value; renderSummary(); schedulePersist(); }));
@@ -203,6 +211,7 @@ document.querySelectorAll('[data-hours]').forEach(button => button.addEventListe
 }));
 $('#new-bounty-back').addEventListener('click', () => setStep(1));
 $('#next-step').addEventListener('click', goForward);
+document.querySelectorAll('[name="payment-rail"]').forEach(input => input.addEventListener('change', () => { if (!$('#refund-error').hidden) validateRefund({ focus: false }); }));
 $('#bounty-form').addEventListener('submit', event => { event.preventDefault(); goForward(); });
 $('#back-step').addEventListener('click', () => { if (state.step > 1) setStep(1); else openTemplates(); });
 $('#edit-brief').addEventListener('click', () => setStep(1));
@@ -213,6 +222,8 @@ document.querySelectorAll('.step').forEach(button => button.addEventListener('cl
 }));
 
 for (const [field, selector] of Object.entries(fieldMap)) $(selector).addEventListener('input', event => { state.draft[field] = event.target.value; schedulePersist(); });
+// Registered after the draft binding above, so it validates the value just typed.
+$('#refund-address').addEventListener('input', () => { if (!$('#refund-error').hidden) validateRefund({ focus: false }); });
 $('#reward-main').addEventListener('input', event => {
   state.draft.amount = event.target.value; renderSummary(); schedulePersist();
 });
@@ -404,6 +415,7 @@ async function saveDraft(openFunding = false) {
     return;
   }
   if (!validateBrief() || !validateConnectedDefinition()) { setStep(1); validateBrief(); validateConnectedDefinition(); return; }
+  if (!validateRefund({ focus: false })) { setStep(1); validateRefund(); return; }
   let payload;
   try { payload = draftPayload(state.draft); }
   catch (error) { showError(error.message); return; }

@@ -77,3 +77,10 @@ test('USDC drafts reject missing, zero or token refund destinations',()=>{
  const d={...freshDraft(),paymentRail:'base-usdc',repository:'example/project',branch:'main',checkName:'acceptance',workflowPath:'.github/workflows/test.yml'};
  for(const refundAddress of ['', '0x'+'0'.repeat(40),'0x036cbd53842c5426634e7929541ec2318f3dcf7e'])assert.throws(()=>draftPayload({...d,refundAddress}),/refund wallet/);
 });
+
+test('USDC drafts require a refund wallet the creator controls', async () => {
+  const { validRefundAddress } = await import('../bounty-model.mjs');
+  assert.equal(validRefundAddress('0x1111111111111111111111111111111111111111'), true);
+  assert.equal(validRefundAddress(' 0x1111111111111111111111111111111111111111 '), true);
+  for (const bad of ['', '0x123', '0x' + '0'.repeat(40), '0x036CbD53842c5426634e7929541eC2318f3dCF7e', 'not-a-wallet']) assert.equal(validRefundAddress(bad), false, bad);
+});
