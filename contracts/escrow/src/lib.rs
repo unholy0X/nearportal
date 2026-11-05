@@ -159,3 +159,6 @@ impl Contract {
         format!("{}/bounty-{}", self.mpc_path, bounty_id)
     }
 }
+
+#[cfg(test)]
+mod tests;
