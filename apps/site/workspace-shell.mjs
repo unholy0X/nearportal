@@ -78,6 +78,7 @@ export function mountShell(host, { path = location.pathname, role, brandSrc = '/
 <p class="ui-menu-state" data-shell="state"></p>
 <a href="/app/settings">${iconMarkup('gear')}Settings &amp; payout details</a>
 <a href="/app/treasury" data-shell="treasury" hidden>${iconMarkup('wallet')}Demo wallet</a>
+<a href="/mcp">${iconMarkup('code')}Connect your agent · MCP guide</a>
 <a href="/demo">${iconMarkup('code')}Judge quickstart</a>
 <button type="button" data-shell="logout">${iconMarkup('logout')}Sign out</button>
 </div></div></div></div>`;

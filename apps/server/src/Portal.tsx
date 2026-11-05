@@ -440,6 +440,7 @@ function Landing({ me }: { me: Me | null }) {
         <span>© 2026 NearPortal</span>
         <a href="/bounties">Explore</a>
         <a href="/app/settings">Account</a>
+        <a href="/mcp">MCP guide</a>
         <span className="np-sandbox-label">Testnet / sandbox</span>
       </footer>
     </div>
