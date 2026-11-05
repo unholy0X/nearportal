@@ -1,0 +1,45 @@
+{
+  "name": "nearportal-app",
+  "version": "0.1.0",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "tasks:start": "tsx server/tasks.ts",
+    "tasks:setup": "node --import tsx scripts/task-setup.ts",
+    "sandbox:deploy": "node --import tsx scripts/sandbox-deploy.ts",
+    "sandbox:check": "node --import tsx scripts/sandbox-check.ts",
+    "sandbox:smoke": "node --import tsx scripts/sandbox-smoke.ts",
+    "sandbox:bank": "node --import tsx scripts/sandbox-bank.ts",
+    "sandbox:start": "ENV_FILE=.env.sandbox node --import tsx server/tasks.ts",
+    "start": "node --import tsx server/tasks.ts",
+    "typecheck": "tsc --noEmit",
+    "sandbox:upgrade": "ENV_FILE=.env.sandbox node --import tsx scripts/sandbox-upgrade.ts",
+    "portal:start": "node --import tsx server/tasks.ts",
+    "treasury:setup": "ENV_FILE=.env.sandbox node --import tsx scripts/treasury-setup.ts"
+  },
+  "license": "MIT",
+  "description": "NearPortal server: GitHub pull-request bounties paid from escrow on NEAR testnet.",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "bs58": "^6.0.0",
+    "ibantools": "4.5.4",
+    "near-api-js": "^7.3.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tsx": "^4.20.6",
+    "viem": "^2.57.16",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.18.0",
+    "@types/react": "^18.3.23",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^4.5.2",
+    "playwright": "1.64.1",
+    "typescript": "^5.9.3",
+    "vite": "^6.4.5"
+  },
+  "private": true,
+  "type": "module"
+}

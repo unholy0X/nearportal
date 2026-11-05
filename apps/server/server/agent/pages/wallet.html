@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verify payout wallet · NearPortal</title>
+<link rel="icon" href="/brand/aurora-portal/favicon-32.png">
+<link rel="stylesheet" href="/agent/assets/agent.css">
+</head>
+<body data-page="wallet">
+<header><img src="/brand/aurora-portal/favicon-48.png" alt=""><strong>nearportal</strong><span>Test funds only · Base Sepolia</span></header>
+<main>
+  <section class="card">
+    <h1>Verify a payout wallet</h1>
+    <p>Your terminal agent asked to use this wallet as a USDC payout destination. Prove you control it by signing a message. Signing transfers nothing and approves no contract.</p>
+    <div id="signin" hidden>
+      <p class="notice">Sign in with the same GitHub account that is connected to your terminal.</p>
+      <div class="actions"><a id="signin-link" class="button primary" href="/auth/github">Sign in with GitHub</a><button id="local-login" class="secondary" type="button" hidden>Local preview sign-in</button></div>
+    </div>
+    <div id="review" hidden>
+      <h2>Wallet</h2>
+      <p class="mono" id="address"></p>
+      <p>Network: <strong>Base Sepolia</strong> (chain 84532) · Account: <strong id="login"></strong></p>
+      <h2>Message to sign</h2>
+      <pre id="message"></pre>
+      <p class="notice">Only EOA wallets (browser extension accounts) are supported. Smart-contract wallets cannot be verified in this version.</p>
+      <div class="actions"><button id="sign" class="primary" type="button">Sign with browser wallet</button></div>
+    </div>
+    <p id="result" class="status" role="status" aria-live="polite"></p>
+  </section>
+  <p class="sandbox">NearPortal sandbox: test networks only. No real funds.</p>
+</main>
+<script src="/agent/assets/agent.js"></script>
+</body>
+</html>
