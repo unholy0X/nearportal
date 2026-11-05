@@ -106,7 +106,7 @@ export class TaskService {
   ) {
     if (input.paymentRail !== "base-usdc" && !bankPaymentsEnabled()) throw new Error(BANK_DISABLED_MESSAGE);
     const bankRefund = input.paymentRail !== "base-usdc" && options.bankRefund
-      ? parsePayout(options.bankRefund, this.config.mode === "sandbox" ? this.config.sandboxPayoutIbans : []) : undefined;
+      ? parsePayout(options.bankRefund, this.config.mode === "sandbox" ? this.config.sandboxPayoutIbans : [], this.config.mode === "sandbox") : undefined;
     if (this.config.mode === "sandbox" && options.ownerId && input.paymentRail !== "base-usdc" && !bankRefund)
       throw new Error("Save the creator's refund bank details in Settings before publishing");
     if (input.marketTerms !== undefined && !options.market)
@@ -307,6 +307,7 @@ export class TaskService {
     const payout = parsePayout(
       input,
       this.config.mode === "sandbox" ? this.config.sandboxPayoutIbans : [],
+      this.config.mode === "sandbox",
     );
     if (shortIban(payout.iban) === (t.policy.bankRefundRecipient ?? this.config.refundShortIban))
       throw new Error(
@@ -355,6 +356,7 @@ export class TaskService {
     const payout = parsePayout(
       input,
       this.config.mode === "sandbox" ? this.config.sandboxPayoutIbans : [],
+      this.config.mode === "sandbox",
     );
     if (shortIban(payout.iban) === (t.policy.bankRefundRecipient ?? this.config.refundShortIban))
       throw new Error(
@@ -388,7 +390,7 @@ export class TaskService {
     validateFundingPolicy(t);
     if (destination.kind === "bank") {
       if (t.policy.paymentRail === "base-usdc") throw new Error("This bounty pays in USDC: connect a wallet destination");
-      const payout = parsePayout(destination.payout, this.config.mode === "sandbox" ? this.config.sandboxPayoutIbans : []);
+      const payout = parsePayout(destination.payout, this.config.mode === "sandbox" ? this.config.sandboxPayoutIbans : [], this.config.mode === "sandbox");
       if (shortIban(payout.iban) === (t.policy.bankRefundRecipient ?? this.config.refundShortIban)) throw new Error("Use a payout IBAN distinct from the client's refund account");
       t.payout = payout;
       t.policy.recipient = payoutLabel(payout);

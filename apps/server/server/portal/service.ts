@@ -283,7 +283,7 @@ export class PortalService {
       if (!currentUser?.payout) throw new Error("Save your refund bank details in Settings before publishing");
       if (!currentUser.bank && String(u.id) !== this.store.meta("operator"))
         throw new Error("Connect your Monerium sandbox account in Settings before publishing");
-      b.bankRefund = this.store.seal(parsePayout(currentUser.payout, this.tasks.config.sandboxPayoutIbans));
+      b.bankRefund = this.store.seal(parsePayout(currentUser.payout, this.tasks.config.sandboxPayoutIbans, true));
     }
     b.status = "Preparing";
     b.error = null;
@@ -324,6 +324,7 @@ export class PortalService {
       this.tasks.config.mode === "sandbox"
         ? this.tasks.config.sandboxPayoutIbans
         : [],
+      this.tasks.config.mode === "sandbox",
     );
     u.payout = {
       firstName: p.firstName,

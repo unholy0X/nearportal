@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { countrySpecs, isSEPACountry, isValidIBAN } from "ibantools";
+import { countrySpecs, isSEPACountry, isValidIBAN, validateIBAN, ValidationErrorsIBAN } from "ibantools";
 import { hash, type Task } from "./domain.ts";
 
 /** Private server-side data; only its salted commitment and masked label are public. */
@@ -29,9 +29,20 @@ export function bankRefundFor(t: Task): PayoutDetails {
   return p;
 }
 
+/**
+ * Monerium sandbox issues test IBANs (BIC FAKEFK01) that satisfy the ISO 13616 mod-97 checksum and
+ * the country's BBAN format but not national account check digits. In sandbox mode only, that one
+ * failure is tolerated; every other check, and live-mode validation, stays strict.
+ */
+function validSandboxIban(iban: string) {
+  const { valid, errorCodes } = validateIBAN(iban, { allowQRIBAN: false });
+  return valid || (errorCodes.length > 0 && errorCodes.every((code) => code === ValidationErrorsIBAN.WrongAccountBankBranchChecksum));
+}
+
 export function parsePayout(
   input: Record<string, unknown>,
   sandboxIbans: readonly string[] = [],
+  sandbox = false,
 ): PayoutDetails {
   const name = (key: string) => {
     const value = input[key];
@@ -50,7 +61,8 @@ export function parsePayout(
       : "";
   if (
     (!isValidIBAN(iban, { allowQRIBAN: false }) &&
-      !sandboxIbans.includes(iban)) ||
+      !sandboxIbans.includes(iban) &&
+      !(sandbox && validSandboxIban(iban))) ||
     !isSEPACountry(iban.slice(0, 2))
   )
     throw new Error("Enter a valid SEPA IBAN");
