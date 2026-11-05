@@ -37,6 +37,11 @@ async function api(path, body) {
   const response = await fetch('/api/portal' + path, { method: body === undefined ? 'GET' : 'POST', headers, credentials: 'same-origin', cache: 'no-store', ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
   const data = await response.json(); if (!response.ok) { const error = new Error(data.error || 'Unable to complete this request.'); error.status = response.status; throw error; } return data;
 }
+/** Publishes a bank draft; on refusal, re-reads /me so the prerequisite steps reflect the server's view. */
+async function publishBankBounty() {
+  if (await action('publish', { revision: state.bounty.revision })) return;
+  try { const me = await api('/me'); if (me.user?.id === state.me?.user?.id) { state.me = me; render(); } } catch { /* Keep the visible error; the next focus retries. */ }
+}
 async function action(name, body = {}) {
   if (state.busy) return;
   state.busy = true; state.error = ''; render();
@@ -146,10 +151,23 @@ function renderReward() {
   // The pill already states funded / processing / paid; explanatory text only when an action is needed.
   if (!(paid || t?.funded)) box.append(el('h2', '', heading), el('p', '', description));
   if (b.role === 'client' && b.status === 'Draft') {
+    if (state.me?.mode === 'sandbox' && (!state.me.bankConnected || !state.me.payout)) {
+      if (!state.me.bankConnected) {
+        box.append(el('p', 'action-note', 'Connect your Monerium sandbox account in NearPortal Settings before setting up escrow. Signing in to Monerium in another tab does not connect it here.'));
+        box.append(link('Connect Monerium →', '/app/settings?bank&returnTo=' + encodeURIComponent('/bounties/' + b.id), 'ui-button'));
+      }
+      if (!state.me.payout) {
+        box.append(el('p', 'action-note', 'Save your bank details for creator refunds before publishing. This destination stays fixed for the bounty.'));
+        box.append(link('Save refund bank details →', '/app/settings?payout&returnTo=' + encodeURIComponent('/bounties/' + b.id), 'ui-button ui-button-secondary'));
+      }
+      if (state.error) { const error = el('p', 'funding-error', state.error); error.setAttribute('role', 'alert'); box.append(error); }
+      return;
+    }
     const escrowReady = b.paymentRail === 'base-usdc' ? state.me?.cryptoPaymentsReady : state.me?.openBountyReady;
     consent(box, `I authorize publishing this brief, locking the criteria and reward, assignment to the first eligible contributor, and automatic payout after my qualifying merge.`, state.consent === b.revision, value => { state.consent = value ? b.revision : ''; });
-    box.append(button(state.busy ? 'Setting up…' : 'Accept & set up escrow →', () => action('publish', { revision: b.revision }), 'ui-button', state.consent !== b.revision || escrowReady === false || state.checkMismatch));
+    box.append(button(state.busy ? 'Setting up…' : 'Accept & set up escrow →', publishBankBounty, 'ui-button', state.consent !== b.revision || escrowReady === false || state.checkMismatch));
     box.append(el('p', 'action-note', 'Publishes the bounty brief and starts escrow setup. Your reward stays unfunded until the deposit is confirmed.'));
+    if (state.error) { const error = el('p', 'funding-error', state.error); error.setAttribute('role', 'alert'); box.append(error); }
     if (escrowReady === false) box.append(el('p', 'action-note', 'Escrow setup is currently unavailable. Your draft is saved.'));
     if (state.checkMismatch) box.append(el('p', 'action-note', 'Fix the verification check in your draft before setting up escrow.'));
   } else if (b.role === 'client' && t && !t.funded && t.jobId != null && renderTreasury(box,b)) {
@@ -432,19 +450,24 @@ else {
   renderIdentity(); await load();
   // Detail refresh every ~10 s (jittered, paused in hidden tabs, backing off on errors).
   const poller = poll(load, { interval: 10000, focus: false });
+  // Returning from Settings (focus, tab switch or back navigation) re-reads /me so Monerium and refund prerequisites are current.
   let focusCheckedAt = Date.now();
-  window.addEventListener('focus', async () => {
-    if (Date.now() - focusCheckedAt < 15000) return; focusCheckedAt = Date.now();
+  const refreshMe = async () => {
+    if (Date.now() - focusCheckedAt < 2000) return; focusCheckedAt = Date.now();
+    let changed = false;
     try {
       const me = await api('/me');
       if (me.user?.id !== state.me?.user?.id) {
         state.bounty = null; state.last = ''; state.deposit = null; state.depositError = ''; state.treasury=null; state.treasuryAt=0; state.treasuryConsent=''; state.manualBank=false; state.treasurySubmission=false; state.treasuryReadError=false; state.consent = ''; state.claimConsent = ''; state.checkedRevision = ''; state.checkMismatch = false;
         $('#bounty-content').hidden = true; $('#loading').hidden = false;
       }
-      state.me = me;
+      changed = JSON.stringify(me) !== JSON.stringify(state.me); state.me = me;
     } catch {}
-    await poller.now(); renderIdentity();
-  });
+    await poller.now(); if (changed) render(); else renderIdentity();
+  };
+  window.addEventListener('focus', refreshMe);
+  window.addEventListener('pageshow', event => { if (event.persisted) refreshMe(); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refreshMe(); });
 }
 
 function renderClaimGate(box) {

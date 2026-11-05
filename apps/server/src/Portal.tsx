@@ -2214,8 +2214,12 @@ const SETTINGS_SECTIONS = [
   { name: "Payout details", icon: "wallet" },
   { name: "Funding connection", icon: "lock" },
 ] as const;
+/** Only a same-origin bounty detail path is accepted, so the link can never leave NearPortal. */
+const BOUNTY_RETURN = /^\/bounties\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function Settings({ me, reload }: { me: Me; reload: () => void }) {
-  const [section, setSection] = useState(new URLSearchParams(location.search).has("payout") ? "Payout details" : "Profile"),
+  const requestedReturn = new URLSearchParams(location.search).get("returnTo") ?? "",
+    bountyReturn = BOUNTY_RETURN.test(requestedReturn) ? requestedReturn : null;
+  const [section, setSection] = useState(new URLSearchParams(location.search).has("bank") ? "Funding connection" : new URLSearchParams(location.search).has("payout") ? "Payout details" : "Profile"),
     [error, setError] = useState(""),
     [success, setSuccess] = useState(""),
     [busy, setBusy] = useState(false),
@@ -2275,6 +2279,14 @@ function Settings({ me, reload }: { me: Me; reload: () => void }) {
                 {" "}
                 <a className="ui-link" href="/demo">
                   Continue judge walkthrough
+                </a>
+              </>
+            )}
+            {bountyReturn && (
+              <>
+                {" "}
+                <a className="ui-link" href={bountyReturn}>
+                  Back to bounty
                 </a>
               </>
             )}
