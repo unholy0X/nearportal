@@ -13,6 +13,7 @@ export const STATUSES = Object.freeze({
   inProgress: { label: 'In progress', tone: 'active', icon: 'code', stage: 'work' },
   inReview: { label: 'In review', tone: 'active', icon: 'pr', stage: 'review' },
   paymentProcessing: { label: 'Payment processing', tone: 'active', icon: 'arrows', stage: 'payment' },
+  refunded: { label: 'Refunded', tone: 'pending', icon: 'arrows', stage: 'paid' },
   paid: { label: 'Paid', tone: 'success', icon: 'check', stage: 'paid' },
   attention: { label: 'Needs attention', tone: 'attention', icon: 'alert', stage: 'review' },
 });
@@ -39,6 +40,8 @@ export function bountyStatus(b, { capabilities } = {}) {
   const make = (key, detail = '') => ({ key, ...STATUSES[key], detail });
   // Open bounties carry developerId 0 with the placeholder login "Unclaimed": that is nobody.
   const dev = t?.policy?.developerId && t.policy.developerLogin ? '@' + t.policy.developerLogin : '';
+  if (t?.refund?.state === 'Processed') return make('refunded', 'Returned to the creator');
+  if (t?.refund) return { ...make('attention', 'Dispute refund processing'), stage: 'payment' };
   if (pay === 'Processed') return make('paid', dev);
   if (t?.disputed) return { ...make('attention', 'Release paused'), stage: 'payment' };
   if (pay === 'NeedsAttention') return { ...make('attention', 'Payment needs attention'), stage: 'payment' };
@@ -109,6 +112,7 @@ export function pullRequestUrl(b) {
 export function nextAction(b, role = 'client', options) {
   const s = bountyStatus(b, options), href = '/bounties/' + b.id, t = b.task;
   const go = (label, target = href, external = false) => ({ label, href: target, external });
+  if (s.key === 'refunded') return go('Refund receipt');
   if (s.key === 'paid') return go('Receipt');
   if (s.key === 'paymentProcessing') return go('Track payment');
   if (s.key === 'attention') return go('Review issue');
@@ -146,12 +150,12 @@ export function summary(items, role = 'client', options) {
     const s = bountyStatus(b, options);
     counts[s.key] = (counts[s.key] || 0) + 1;
     if (s.key === 'paid') { if(b.paymentRail==='base-usdc') paidUSDC+=b.amountCents; else paidCents+=b.amountCents; }
-    else if (b.task?.funded) {if(b.paymentRail==='base-usdc') securedUSDC+=b.amountCents;else securedCents+=b.amountCents;}
+    else if (s.key !== 'refunded' && b.task?.funded) {if(b.paymentRail==='base-usdc') securedUSDC+=b.amountCents;else securedCents+=b.amountCents;}
   }
   const parts = [];
   const add = (key, text) => { if (counts[key]) parts.push(`${counts[key]} ${text}`); };
   if (role === 'client') { add('toFund', 'to fund'); add('available', 'available'); }
-  add('inProgress', 'in progress'); add('inReview', 'in review'); add('paymentProcessing', 'payment processing'); if (counts.attention) parts.push(`${counts.attention} ${counts.attention === 1 ? 'needs' : 'need'} attention`);
+  add('refunded', 'refunded'); add('inProgress', 'in progress'); add('inReview', 'in review'); add('paymentProcessing', 'payment processing'); if (counts.attention) parts.push(`${counts.attention} ${counts.attention === 1 ? 'needs' : 'need'} attention`);
   if (role === 'client' && securedCents) parts.push(`${money(securedCents)} secured in escrow`);
   if (paidCents) parts.push(`${money(paidCents)} ${role === 'developer' ? 'received' : 'paid out'}`);
   if(role==='client' && securedUSDC) parts.push(`${money(securedUSDC,"base-usdc")} secured in escrow`);

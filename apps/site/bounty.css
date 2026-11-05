@@ -192,7 +192,6 @@
 
 .required-check-result{font-size:13px;font-weight:650;margin:14px 0 8px}.reported-checks{font-size:12px;color:var(--ui-soft);margin:8px 0}.reported-checks summary{cursor:pointer;min-height:28px}.reported-checks ul{padding-left:18px;line-height:1.8}.verification-time{font-size:11px;color:var(--ui-soft);margin-top:8px}.verification-refresh-pending{font-size:12px;color:var(--ui-deep-violet);padding:10px 12px;border-radius:10px;background:var(--ui-tint);margin-top:12px}
 
-.owner-acceptance{margin-top:20px;padding:18px;border:1px solid var(--ui-line-strong);background:var(--ui-tint);border-radius:12px}.owner-acceptance h3{font-size:15px;margin:0 0 8px}.owner-acceptance .ui-button{margin-top:12px}
 
 /* Deadline assignment card */
 .assignment-terms{margin:0 0 12px;font-size:13px;font-weight:600;color:var(--ui-heading)}

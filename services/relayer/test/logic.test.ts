@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { amountFromMessage, classifyIncoming, COOLING_OFF_MS, counterpart, eurToCents, payeeFor, shortIban, type JobView } from "../src/logic.ts";
+import { acceptsDeposits, amountFromMessage, counterpart, eurToCents, payeeFor, shortIban } from "../src/logic.ts";
 
 test("shortIban matches Monerium's format", () => {
   // Monerium sandbox example IBAN; use one issued to your own Monerium sandbox account.
@@ -22,33 +22,27 @@ test("amountFromMessage reads the signed amount", () => {
   assert.throws(() => amountFromMessage("Send EUR 216 to somebody"));
 });
 
-const base: JobView = { state: "Signed", off_premises: true, signed_at_ns: 0, deposited_cents: 0, milestones: [{ amount_cents: 21_600 }, { amount_cents: 50_400 }] };
-
-test("classifyIncoming respects the cooling-off period", () => {
-  assert.equal(classifyIncoming(base, 72_000, COOLING_OFF_MS - 1), "excess");
-  assert.equal(classifyIncoming(base, 72_000, COOLING_OFF_MS), "deposit");
-  assert.equal(classifyIncoming({ ...base, off_premises: false }, 72_000, 0), "deposit");
+test("deposits are reported for every bounty state except an unverified or rejected address", () => {
+  for (const state of ["AwaitingDeposit", "Funded", "Disputed", "Closed"] as const) assert.equal(acceptsDeposits(state), true, state);
+  assert.equal(acceptsDeposits("VerifyingAddress"), false);
+  assert.equal(acceptsDeposits("Cancelled"), false);
 });
 
-test("classifyIncoming sends overpayments and late money to excess", () => {
-  assert.equal(classifyIncoming({ ...base, off_premises: false }, 72_001, 0), "excess");
-  assert.equal(classifyIncoming({ ...base, state: "Funded" }, 1, 0), "excess");
-  assert.equal(classifyIncoming({ ...base, state: "VerifyingAddress" }, 1, 0), "ignore");
-});
-
-test("payeeFor requires exactly one matching party", () => {
+test("payeeFor follows the payout kind and the signed short IBAN", () => {
   // Monerium sandbox example IBAN; use one issued to your own Monerium sandbox account.
-  const artisan = { iban: "FR7630006000011234567890189", firstName: "Marc", lastName: "Durand", country: "FR" };
-  const client = { iban: "FR1420041010050500013M02606", firstName: "Josette", lastName: "Martin", country: "FR" };
-  assert.equal(payeeFor("FR76...0189", artisan, client), artisan);
-  assert.equal(payeeFor("FR14...2606", artisan, client), client);
-  assert.throws(() => payeeFor("DE89...3000", artisan, client));
-  assert.throws(() => payeeFor("FR76...0189", artisan, { ...client, iban: artisan.iban }));
+  const developer = { iban: "FR7630006000011234567890189", firstName: "Ada", lastName: "Example", country: "FR" };
+  const client = { iban: "FR1420041010050500013M02606", firstName: "Grace", lastName: "Example", country: "FR" };
+  assert.equal(payeeFor({ kind: "Developer", short_iban: "FR76...0189" }, { developer, client }), developer);
+  assert.equal(payeeFor({ kind: "Refund", short_iban: "FR14...2606" }, { developer, client }), client);
+  assert.equal(payeeFor({ kind: "SurplusRefund", short_iban: "FR14...2606" }, { client }), client);
+  assert.throws(() => payeeFor({ kind: "Developer", short_iban: "FR14...2606" }, { developer, client }), /does not match/);
+  assert.throws(() => payeeFor({ kind: "Refund", short_iban: "FR76...0189" }, { developer, client }), /does not match/);
+  assert.throws(() => payeeFor({ kind: "Developer", short_iban: "FR76...0189" }, { client }), /No registered developer/);
 });
 
 test("counterpart builds individual and corporate details", () => {
-  assert.deepEqual(counterpart({ iban: "FR76 3000", firstName: "Marc", lastName: "Durand", country: "FR" }).details, { firstName: "Marc", lastName: "Durand", country: "FR" });
-  assert.deepEqual(counterpart({ iban: "FR76", companyName: "Durand Peinture", country: "FR" }).details, { companyName: "Durand Peinture", country: "FR" });
+  assert.deepEqual(counterpart({ iban: "FR76 3000", firstName: "Ada", lastName: "Example", country: "FR" }).details, { firstName: "Ada", lastName: "Example", country: "FR" });
+  assert.deepEqual(counterpart({ iban: "FR76", companyName: "Example Studio", country: "FR" }).details, { companyName: "Example Studio", country: "FR" });
 });
 
 test('verified own-account refunds use the own payout recipient variant', () => {

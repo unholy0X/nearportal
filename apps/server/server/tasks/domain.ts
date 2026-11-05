@@ -10,6 +10,8 @@ export interface TaskPolicy {
   amountCents: number;
   currency: "EUR" | "USD";
   paymentRail?: "base-usdc";
+  /** Client destination, fixed in the funding agreement before deposits. */
+  refundAddress?: string;
   repository: string;
   repositoryId: number;
   branch: string;
@@ -65,7 +67,6 @@ export interface PrEvidence {
 }
 
 export interface Verdict {
-  authorizationKind?: "owner-acceptance";
   status: "eligible" | "pending" | "blocked";
   reasons: string[];
   evidenceHash: string;
@@ -169,9 +170,9 @@ export interface Task {
   mode: "simulation" | "sandbox";
   githubMode: "fixture" | "live";
   bankProfileKey?: string;
+  refund?: {state: PaymentState; reference: string|null; error: string|null};
   crypto?: { startBlock: string; scanBlock: string; address: string; depositedUnits: string; surplusUnits: string; verifiedFundingHash?: string; deposits?: { txHash: string; logIndex: number; blockNumber: string; units: string }[]; receiptBackfillTo?: string };
   ownerId?: number;
-  ownerAcceptance?: import("./owner-acceptance.ts").OwnerAcceptance;
   mergeMethodAmendment?: import("./merge-policy.ts").MergeMethodAmendment;
   portalId?: string;
   openBounty?: boolean;

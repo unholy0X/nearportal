@@ -71,7 +71,7 @@ export function bountyMilestones(b) {
  return [
  {label:'Funded',done:Boolean(t?.funded),detail:t?.funded?'Funds secured':'Awaiting deposit'},
  {label:'Claimed',done:assigned,detail:assigned?'@'+t.policy.developerLogin:'Open to claim'},
- {label:t?.ownerAcceptance?'Accepted':'Checks',done:Boolean(checks),detail:checks?(t?.ownerAcceptance?'Owner approved':'Verified'):t?.verdict?.status==='blocked'?'Needs attention':t?.prNumber?'Verification pending':'Waiting for PR'},
+ {label:'Checks',done:Boolean(checks),detail:checks?'Verified':t?.verdict?.status==='blocked'?'Needs attention':t?.prNumber?'Verification pending':'Waiting for PR'},
  {label:'Merged',done:merged,detail:merged?'Merge recorded':'Awaiting client'},
  {label:'Paid',done:paid,detail:paid?'Payment confirmed':t?.payment?.state==='NeedsAttention'?'Needs attention':processing?'Processing':'Not released'},
  ];

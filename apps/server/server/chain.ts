@@ -78,9 +78,9 @@ async function send(signer: string, methodName: string, args: Record<string, unk
     }), { op: "call", enforceTimeout: false });
   } catch (e) {
     // A rate-limited RPC can make the failover resend a transaction that already went through, or
-    // leave a stale nonce. Retry once with a fresh account, except create_job, which is not
+    // leave a stale nonce. Retry once with a fresh account, except create_bounty, which is not
     // idempotent; every other method refuses a repeated state change.
-    if (!retried && !["create_job"].includes(methodName) && e instanceof Error && /nonce/i.test(e.message)) {
+    if (!retried && !["create_bounty"].includes(methodName) && e instanceof Error && /nonce/i.test(e.message)) {
       accounts.delete(signer);
       await new Promise((r) => setTimeout(r, 1500));
       return send(signer, methodName, args, deposit, true, contractId);

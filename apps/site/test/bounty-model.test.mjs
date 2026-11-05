@@ -21,11 +21,11 @@ test('restored drafts cannot inject unsupported identity or unbounded criteria',
   assert.equal(restored.template, 'near'); assert.equal(restored.id, null); assert.equal(restored.code, null); assert.equal(restored.criteria.length, 20);
 });
 
-test('USDC drafts persist the rail without wallet connection, bank data or refund address',()=>{
- const d={...freshDraft(),paymentRail:'base-usdc',amount:'1',repository:'example/project',branch:'main',checkName:'acceptance',workflowPath:'.github/workflows/test.yml',protectedPaths:'test/acceptance.mjs'};
+test('USDC drafts pin an explicit refund address without requesting a wallet connection',()=>{
+ const d={...freshDraft(),paymentRail:'base-usdc',refundAddress:'0x'+'c1ea2'.repeat(8),amount:'1',repository:'example/project',branch:'main',checkName:'acceptance',workflowPath:'.github/workflows/test.yml',protectedPaths:'test/acceptance.mjs'};
  const saved=hydrateDraft(d),body=draftPayload(saved);
  assert.equal(saved.paymentRail,'base-usdc');assert.equal(body.paymentRail,'base-usdc');assert.equal(body.amountCents,100);
- assert.equal(body.walletAddress,undefined);assert.equal(body.refundAddress,undefined);assert.equal(body.iban,undefined);
+ assert.equal(body.walletAddress,undefined);assert.equal(body.refundAddress,d.refundAddress);assert.equal(body.iban,undefined);
 });
 
 test('restoring a published or accepted bounty preserves inputs but clears its edit identity', () => {
@@ -46,7 +46,7 @@ test('hours and days preserve the exact agreed delivery window through serializa
   const { deliveryHours, changeDeliveryUnit, deliveryLabel } = await import('../bounty-model.mjs');
   const complete = {...freshDraft(), repository:'example/project', branch:'main', workflowPath:'.github/workflows/check.yml', checkName:'acceptance', delivery:'fixed'};
   for (const rail of ['bank', 'base-usdc']) for (const hours of [1,6,12,24,48,168,2160]) {
-    const draft = {...complete, paymentRail:rail, deliveryValue:String(hours), deliveryUnit:'hours'};
+    const draft = {...complete, paymentRail:rail, refundAddress:'0x'+'c1ea2'.repeat(8), deliveryValue:String(hours), deliveryUnit:'hours'};
     const days = changeDeliveryUnit(draft,'days');
     assert.equal(deliveryHours(hydrateDraft(days)),hours);
     assert.equal(draftPayload(days).marketTerms.deliveryHours,hours);
@@ -71,4 +71,9 @@ test('invalid durations never silently become valid funding terms', async () => 
     assert.throws(()=>deliveryHours(hydrateDraft(draft)));
     assert.throws(()=>draftPayload(draft));
   }
+});
+
+test('USDC drafts reject missing, zero or token refund destinations',()=>{
+ const d={...freshDraft(),paymentRail:'base-usdc',repository:'example/project',branch:'main',checkName:'acceptance',workflowPath:'.github/workflows/test.yml'};
+ for(const refundAddress of ['', '0x'+'0'.repeat(40),'0x036cbd53842c5426634e7929541ec2318f3dcf7e'])assert.throws(()=>draftPayload({...d,refundAddress}),/refund wallet/);
 });

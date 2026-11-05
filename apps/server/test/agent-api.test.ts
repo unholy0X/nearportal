@@ -326,7 +326,7 @@ test("selected job succeeds while an unselected job runs: paid once; merged is n
   assert.ok(act.payments[0].receipt?.reference, "receipt after confirmation");
   await w.pass(3);
   assert.equal((w.tasks.db.prepare("SELECT COUNT(*) AS n FROM releases").get() as { n: number }).n, 1);
-  assert.equal(w.chain.calls.filter((c) => c.method === "release_crypto_market").length, 1);
+  assert.equal(w.chain.calls.filter((c) => c.method === "settle_bounty").length, 1);
   await w.close();
 });
 
@@ -350,7 +350,7 @@ test("prepare validates without mutation and with bounded GitHub reads; exact to
   assert.equal(w.gh.calls.filter((c) => c.endsWith("GET /repos/acme/widgets")).length, 1, "one repository read for 10 items");
   // Validation errors are reported per item, before any mutation.
   const bad = await w.call("POST", "/api/agent/v1/prepare", { bearer: owner, body: { items: [
-    w.item(1, { rewardUsdc: "1.234" }), w.item(2, { jobs: ["acceptance", "lint"] }), w.item(3, { jobs: ["e2e"] }), w.item(4, { refundAddress: "0x" + "1".repeat(40) }),
+    w.item(1, { rewardUsdc: "1.234" }), w.item(2, { jobs: ["acceptance", "lint"] }), w.item(3, { jobs: ["e2e"] }), w.item(4, { refundAddress: "0x" + "0".repeat(40) }),
     w.item(5, { repository: "other/repo" }), w.item(6, { protectedPaths: ["missing.ts"] }), w.item(7, { delivery: { hours: 3000 } }), w.item(8, { surprise: true }), w.item(8), w.item(8),
   ] } });
   assert.equal(bad.data.valid, false);

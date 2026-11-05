@@ -15,7 +15,7 @@ import { PortalStore, type Bounty, type User } from "../server/portal/store.ts";
 import { MarketStore } from "../server/portal/market-store.ts";
 import { MARKET_RELAY_GRACE_MS } from "../server/portal/market.ts";
 import { FixedBounties } from "../server/market/fixed.ts";
-import { SimChain } from "../server/market/sim-chain.ts";
+import { simEscrows } from "../server/market/sim-chain.ts";
 import type { Verdict } from "../server/tasks/domain.ts";
 
 const H = 3_600_000;
@@ -34,8 +34,9 @@ function world(rail: Rail, path = ":memory:") {
   const tasks = new TaskStore(path);
   const portalStore = new PortalStore(tasks.db, "", KEY);
   const markets = new MarketStore(tasks.db, portalStore);
-  const chain = new SimChain(tasks.db, { now: () => clock.now + clock.chainSkew, funded: (k) => tasks.get(k).funded, escrowCents: (k) => tasks.get(k).policy.amountCents });
-  const payments = new SimulatedPayments(tasks, chain);
+  const escrows = simEscrows(tasks.db, { now: () => clock.now + clock.chainSkew });
+  const chain = rail === "bank" ? escrows.bank : escrows.usdc;
+  const payments = new SimulatedPayments(tasks, escrows);
   const service = new TaskService(tasks, new GitHub({}), payments, { mode: "simulation", githubMode: "fixture", verifier: "sim-verifier", recipient: "r" });
   const prs = new Map<number, any>();
   const github = { get: async <T>(path: string) => {
@@ -52,7 +53,7 @@ type World = ReturnType<typeof world>;
 async function bounty(w: World, deliveryHours = 24): Promise<Bounty> {
   const id = crypto.randomUUID(), code = "NP-" + randomBytes(5).toString("hex").toUpperCase();
   const created = await w.service.create(
-    { title: "CSV export", criteria: "Pass the acceptance tests", amountCents: 5000, repository: "client/repo", ...(w.rail === "base-usdc" ? { paymentRail: "base-usdc" } : {}) },
+    { title: "CSV export", criteria: "Pass the acceptance tests", amountCents: 5000, repository: "client/repo", ...(w.rail === "base-usdc" ? { paymentRail: "base-usdc", refundAddress: "0x" + "c1ea2".repeat(8) } : {}) },
     { openBounty: true, ownerId: owner.id, portalId: id, portalCode: code, market: { kind: "fixed", deliveryHours } },
   );
   const b = { id, code, ownerId: owner.id, owner: owner.login, repository: "client/repo", private: false, title: "CSV export", description: "d", criteria: ["c"], amountCents: 5000, ...(w.rail === "base-usdc" ? { paymentRail: "base-usdc" as const } : {}), marketTerms: { version: 1, kind: "fixed", budgetCents: 5000, deliveryHours, biddingHours: 0, confirmationHours: 0 }, branch: "main", checkName: "acceptance", checkAppId: 15368, workflowPath: ".github/workflows/acceptance.yml", protectedPaths: "package.json", taskId: created.task.id, issueNumber: 1, issueUrl: null, status: "Open", published: true, error: null, createdAt: "", updatedAt: "" } as Bounty;
@@ -91,7 +92,7 @@ for (const rail of ["bank", "base-usdc"] as Rail[]) {
     const w = world(rail);
     const b = await bounty(w);
     await pass(w, b);
-    assert.equal(calls(w, rail === "bank" ? "configure_bounty_market" : "configure_crypto_market"), 1);
+    assert.equal(calls(w, "create_bounty"), 1);
     await assert.rejects(claim(w, b, alice), /not funded/);
     w.service.fund(w.tasks.get(b.taskId!));
     await pass(w, b);
@@ -119,7 +120,7 @@ for (const rail of ["bank", "base-usdc"] as Rail[]) {
     assert.equal(w.fixed.view(b, alice.id)!.assignment!.deadline, null, "no deadline shown while processing");
     pr(w, 7, alice, `${b.code}-A1`);
     await assert.rejects(submit(w, b, alice, 7), /still being confirmed/);
-    w.chain.faults.push({ method: rail === "bank" ? "bind_market_assignment" : "bind_crypto_assignment", when: "before" });
+    w.chain.faults.push({ method: "assign_developer", when: "before" });
     w.clock.now += 40 * 60_000; // provider delay
     await pass(w, b).catch(() => {});
     assert.equal(market(w, b).assignment!.confirmedAt, null);
@@ -182,7 +183,7 @@ for (const rail of ["bank", "base-usdc"] as Rail[]) {
     w.clock.now = due;
     pr(w, 7, alice, `${b.code}-A1`, { created_at: new Date(due - H).toISOString() });
     await submit(w, b, alice, 7);
-    w.chain.faults.push({ method: rail === "bank" ? "record_market_submission" : "record_crypto_submission", when: "before" });
+    w.chain.faults.push({ method: "record_submission", when: "before" });
     w.clock.now = due + 2 * 60_000;
     await pass(w, b).catch(() => {});
     w.clock.now = due + 10 * 60_000; // within grace
@@ -211,7 +212,7 @@ for (const rail of ["bank", "base-usdc"] as Rail[]) {
     assert.equal(t.policy.developerId, 0);
     assert.equal(t.funded, true, "funds stay secured");
     assert.equal(t.payment.state, "NotRequested", "no refund, no transfer");
-    assert.equal(calls(w, rail === "bank" ? "release_market_assignment" : "release_crypto_market"), 0);
+    assert.equal(calls(w, "settle_bounty"), 0);
     assert.equal(w.markets.activity({ bountyId: b.id }).find((e) => e.kind === "assignment-expired")!.cause, "deadline");
     // Next claim: a fresh generation, marker and full window; the old marker is refused.
     w.clock.now += H;
@@ -251,7 +252,7 @@ for (const rail of ["bank", "base-usdc"] as Rail[]) {
     assert.equal(market(w, b).phase, "paid");
     await pass(w, b, 3); // duplicate events after payment
     assert.equal((w.tasks.db.prepare("SELECT COUNT(*) AS n FROM releases").get() as { n: number }).n, 1);
-    assert.equal(calls(w, rail === "bank" ? "release_market_assignment" : "release_crypto_market"), 1);
+    assert.equal(calls(w, "settle_bounty"), 1);
     assert.deepEqual(w.markets.activity({ userId: alice.id }).map((e) => e.kind), ["assignment-confirmed", "submission-received", "payment-confirmed"]);
   });
 
@@ -284,7 +285,7 @@ for (const rail of ["bank", "base-usdc"] as Rail[]) {
     await pass(w, b);
     assert.equal(market(w, b).phase, "paused");
     assert.equal(market(w, b).assignment!.userId, alice.id, "no silent reassignment");
-    assert.equal(calls(w, rail === "bank" ? "expire_market_assignment" : "expire_crypto_assignment"), 0);
+    assert.equal(calls(w, "expire_assignment"), 0);
   });
 
   test(`${R} restarts at every step resume without duplicate binding or payment`, async () => {
@@ -306,7 +307,7 @@ for (const rail of ["bank", "base-usdc"] as Rail[]) {
         w = next;
       };
       restart();
-      const bindMethod = rail === "bank" ? "bind_market_assignment" : "bind_crypto_assignment";
+      const bindMethod = "assign_developer";
       w.chain.faults.push({ method: bindMethod, when: "after" }); // bound on chain, outcome unknown locally
       await pass(w, b).catch(() => {});
       restart();
@@ -320,7 +321,7 @@ for (const rail of ["bank", "base-usdc"] as Rail[]) {
       assert.ok(w.tasks.get(b.taskId!).marketSubmission!.relayedAt);
       w.service.simulate(w.tasks.get(b.taskId!), "ready", "developer");
       w.service.simulate(w.tasks.get(b.taskId!), "merged", "client");
-      const releaseMethod = rail === "bank" ? "release_market_assignment" : "release_crypto_market";
+      const releaseMethod = "settle_bounty";
       w.chain.faults.push({ method: releaseMethod, when: "after" }); // broadcast, crash before local record
       await pass(w, b).catch(() => {});
       assert.equal(w.tasks.get(b.taskId!).payment.state, "Authorized");
@@ -341,7 +342,7 @@ for (const rail of ["bank", "base-usdc"] as Rail[]) {
     await claim(w, b, alice);
     await pass(w, b, 2);
     w.clock.now = market(w, b).assignment!.deadline + MARKET_RELAY_GRACE_MS + 1;
-    const method = rail === "bank" ? "expire_market_assignment" : "expire_crypto_assignment";
+    const method = "expire_assignment";
     w.chain.faults.push({ method, when: "after" });
     await pass(w, b);
     assert.equal(market(w, b).phase, "available", "uncertain chain expiry is re-read and completed");
@@ -359,7 +360,7 @@ for (const rail of ["bank", "base-usdc"] as Rail[]) {
     await w.fixed.step(w.tasks.get(t.id));
     assert.equal(market(w, b).phase, "available");
     assert.equal(w.tasks.get(t.id).funded, true);
-    assert.equal(calls(w, rail === "bank" ? "expire_market_assignment" : "expire_crypto_assignment"), 1);
+    assert.equal(calls(w, "expire_assignment"), 1);
     await claim(w, b, bob); await pass(w, b, 2);
     assert.equal(market(w, b).assignment!.generation, 2);
   });
@@ -419,7 +420,7 @@ test("bank and USDC differ only in adapter calls and destinations", async () => 
   }
 });
 
-test("[usdc] a provider outage beyond grace preserves and relays the original timely submission", async () => {
+test("[usdc] an outage beyond the common relay grace preserves evidence but cannot authorize payment", async () => {
   const w = world("base-usdc"), b = await bounty(w);
   await fund(w, b); await claim(w, b, alice); await pass(w, b, 2);
   const due = market(w, b).assignment!.deadline;
@@ -427,8 +428,21 @@ test("[usdc] a provider outage beyond grace preserves and relays the original ti
   await submit(w, b, alice, 7);
   w.clock.now = due + 72 * H;
   await pass(w, b);
-  assert.ok(w.tasks.get(b.taskId!).marketSubmission!.relayedAt);
+  assert.equal(w.tasks.get(b.taskId!).marketSubmission!.relayedAt, null);
   assert.equal(market(w, b).phase, "in-review");
-  assert.equal(calls(w, "expire_crypto_assignment"), 0);
+  assert.equal(calls(w, "settle_bounty"), 0);
+  assert.equal(calls(w, "expire_assignment"), 0);
+  assert.match(w.tasks.get(b.taskId!).payment.error ?? "", /relay window/);
   assert.equal(w.tasks.get(b.taskId!).marketSubmission!.receivedAt, due);
+});
+
+
+test('[usdc] a refund wallet cannot reserve an exclusive developer assignment',async()=>{
+ const w=world('base-usdc');const b=await bounty(w);await fund(w,b);
+ const refund=w.tasks.get(b.taskId!).policy.refundAddress!;
+ await assert.rejects(w.service.exclusive(`task:${b.taskId}`,()=>w.fixed.claim(b,alice,{acceptedPolicyHash:market(w,b).policyHash},{kind:'usdc',address:refund,proofVersion:'verified'},true)),/payout address/);
+ assert.equal(market(w,b).phase,'available');assert.equal(market(w,b).assignment,null);
+ assert.equal(w.tasks.get(b.taskId!).policy.developerId,0);
+ await claim(w,b,alice);await pass(w,b,2);
+ assert.ok(market(w,b).assignment!.confirmedAt);
 });

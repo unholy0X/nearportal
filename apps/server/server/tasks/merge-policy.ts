@@ -18,8 +18,8 @@ function validate(t: Task, e: PrEvidence, a: MergeMethodAmendment) {
     throw new Error("Merge amendments are limited to live testnet USDC agreements");
   if (a.kind !== "any-merge" || a.taskId !== t.id || a.ownerId !== t.ownerId || !t.policy.mergerIds.includes(a.ownerId))
     throw new Error("Only the agreed bounty owner can amend the merge method");
-  if (!t.funded || !t.clientAccepted || !t.developerAccepted || t.disputed || t.ownerAcceptance)
-    throw new Error("An accepted, funded, undisputed agreement without a CI waiver is required");
+  if (!t.funded || !t.clientAccepted || !t.developerAccepted || t.disputed)
+    throw new Error("An accepted, funded, undisputed agreement is required");
   if (t.policy.mergeMethod !== "squash" || hash(t.policy) !== t.policyHash || a.policyHash !== t.policyHash ||
       !t.fundingPolicyHash || a.fundingPolicyHash !== t.fundingPolicyHash)
     throw new Error("The original funded agreement changed");

@@ -1,8 +1,10 @@
 // Usage:
-//   npm run relayer -- register <jobId> <artisan.json> <client.json> [--move-iban]
+//   npm run relayer -- register <bountyId> <client.json> [developer.json] [--move-iban]
 //   npm run relayer -- once
 //   npm run relayer -- watch
-// Party files: {"iban":"FR76...","firstName":"Marc","lastName":"Durand","country":"FR"}
+// Party files: {"iban":"FR76...","firstName":"Ada","lastName":"Example","country":"FR"}
+// The client file is the refund account fixed at bounty creation; the developer file is the
+// payout account of the active assignment (register again after a new assignment).
 import { readFileSync } from "node:fs";
 import { loadConfig } from "./config.ts";
 import { Monerium } from "./monerium.ts";
@@ -17,12 +19,12 @@ const cfg = loadConfig();
 const store = new Store(cfg.stateFile);
 
 if (command === "register") {
-  const [jobId, artisanFile, clientFile] = rest;
-  if (!jobId || !artisanFile || !clientFile) throw new Error("register <jobId> <artisan.json> <client.json> [--move-iban]");
+  const [bountyId, clientFile, developerFile] = rest.filter((arg) => !arg.startsWith("--"));
+  if (!bountyId || !clientFile) throw new Error("register <bountyId> <client.json> [developer.json] [--move-iban]");
   const read = (f: string) => JSON.parse(readFileSync(f, "utf8")) as Party;
-  store.state.jobs[jobId] = { artisan: read(artisanFile), client: read(clientFile), moveIbanHere: rest.includes("--move-iban") };
+  store.state.bounties[bountyId] = { client: read(clientFile), ...(developerFile ? { developer: read(developerFile) } : {}), moveIbanHere: rest.includes("--move-iban") };
   store.save();
-  log(`job ${jobId} registered`);
+  log(`bounty ${bountyId} registered`);
 } else if (command === "once" || command === "watch") {
   const escrow = new Escrow(cfg);
   const monerium = new Monerium(cfg);
@@ -38,5 +40,5 @@ if (command === "register") {
     if (command === "watch") await new Promise((r) => setTimeout(r, cfg.pollSeconds * 1000));
   } while (command === "watch");
 } else {
-  console.log("Commands: register <jobId> <artisan.json> <client.json> [--move-iban] | once | watch");
+  console.log("Commands: register <bountyId> <client.json> [developer.json] [--move-iban] | once | watch");
 }

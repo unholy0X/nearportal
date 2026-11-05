@@ -6,7 +6,7 @@ const shell = mountShell($('#app-header'), { path: location.pathname, brandSrc: 
 const state = { draft: freshDraft(), step: 1, me: null, repos: [], nextPage: null, setup: null, setupRequest: 0, checkRequest: 0, filesRequest: 0, suggestedFiles: [], saving: false, editIndex: null, storageKey: 'nearportal:bounty:anonymous:v1', initialized: false };
 const money = cents => state.draft.paymentRail === 'base-usdc' ? (cents/100).toFixed(2)+' USDC' : new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR' }).format(cents / 100);
 let toastTimer, persistTimer, reconnecting = false, editVersion = 0;
-const fieldMap = { title: '#bounty-title', description: '#description', branch: '#branch', checkName: '#check-name', protectedPaths: '#protected-paths' };
+const fieldMap = { refundAddress: '#refund-address', title: '#bounty-title', description: '#description', branch: '#branch', checkName: '#check-name', protectedPaths: '#protected-paths' };
 
 function icon(name) {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.setAttribute('class', 'icon'); svg.setAttribute('aria-hidden', 'true');
@@ -65,6 +65,9 @@ function renderCriteria() {
 function selectedRepo() { return state.repos.find(repo => repo.fullName === state.draft.repository); }
 function renderSummary() {
   const crypto = state.draft.paymentRail === 'base-usdc';
+  $('#refund-wallet-field').hidden = !crypto;
+  $('#review-refund').hidden = !crypto;
+  $('#review-refund').textContent = 'Refund wallet (fixed before funding): ' + (state.draft.refundAddress || 'Required');
   document.querySelectorAll('[name="payment-rail"]').forEach(input => { input.checked = input.value === state.draft.paymentRail; });
   document.querySelectorAll('[data-money-unit]').forEach(n => n.textContent = crypto ? 'USDC' : 'EUR');
   const repo = selectedRepo();
@@ -244,7 +247,7 @@ function openTemplates() {
     if (id === state.draft.template) { const selected = document.createElement('span'); selected.className = 'template-selected'; selected.append(icon('check')); button.append(selected); }
     button.addEventListener('click', () => {
       const previous = state.draft;
-      state.draft = { ...freshDraft(id), repository: previous.repository, paymentRail: previous.paymentRail, delivery: previous.delivery, deliveryValue: previous.deliveryValue, deliveryUnit: previous.deliveryUnit, amount: previous.amount, branch: previous.branch, workflowPath: previous.workflowPath, protectedPaths: previous.protectedPaths, checkAppId: previous.checkAppId, checkName: previous.checkName, id: previous.id, code: previous.code };
+      state.draft = { ...freshDraft(id), repository: previous.repository, paymentRail: previous.paymentRail, refundAddress: previous.refundAddress, delivery: previous.delivery, deliveryValue: previous.deliveryValue, deliveryUnit: previous.deliveryUnit, amount: previous.amount, branch: previous.branch, workflowPath: previous.workflowPath, protectedPaths: previous.protectedPaths, checkAppId: previous.checkAppId, checkName: previous.checkName, id: previous.id, code: previous.code };
       syncFields(); setStep(1); $('#template-dialog').close(); schedulePersist();
     });
     options.append(button);

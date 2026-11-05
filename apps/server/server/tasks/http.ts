@@ -90,15 +90,11 @@ export async function taskRuntime() {
     useGhCli: process.env.GITHUB_USE_CLI === "1",
   });
   // Simulation mode uses a simulated escrow chain (same market rules as the contracts, no funds).
-  const { SimChain } = await import("../market/sim-chain.ts");
+  const { simEscrows } = await import("../market/sim-chain.ts");
   const payments =
     maintenanceEnabled() ? pausedPayments() : mode === "sandbox"
       ? bankPaymentsEnabled() ? await sandboxPayments(store) : disabledBankPayments()
-      : new SimulatedPayments(store, new SimChain(store.db, {
-          now: () => Date.now(),
-          funded: (key) => { try { return store.get(key).funded; } catch { return false; } },
-          escrowCents: (key) => store.get(key).policy.amountCents,
-        }));
+      : new SimulatedPayments(store, simEscrows(store.db, { now: () => Date.now(), verifier: "local-demo-verifier" }));
   const service = new TaskService(store, github, payments, {
     mode: mode as "simulation" | "sandbox",
     githubMode: githubMode as "fixture" | "live",

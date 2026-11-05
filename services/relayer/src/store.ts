@@ -4,16 +4,18 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import { dirname } from "node:path";
 import type { Party } from "./logic.ts";
 
-export interface JobRecord {
-  artisan: Party;
+export interface BountyRecord {
+  /** The assigned developer's payout account; absent until a developer is assigned. */
+  developer?: Party;
+  /** The client's refund account (the bounty's `refund_short_iban`). */
   client: Party;
-  /** Sandbox demo only: move the profile's single IBAN to this job's address once linked. */
+  /** Sandbox demo only: move the profile's single IBAN to this bounty's address once linked. */
   moveIbanHere?: boolean;
   linked?: boolean;
 }
 
 export interface State {
-  jobs: Record<string, JobRecord>;
+  bounties: Record<string, BountyRecord>;
   /** Monerium issue orders already reported to the contract. */
   reportedOrders: string[];
   /** Payout id → Monerium redeem order id. */
@@ -24,12 +26,12 @@ export interface State {
   pendingSubmissions?: Record<string, { memo: string; at: string; requestId?: string; error?: string }>;
   /** Incremental-scan cursor: facts that never change once observed on-chain. */
   scan?: {
-    /** Tracked jobs seen Closed or Cancelled (no more deposits, address links or payouts). */
-    terminalJobs: number[];
+    /** Tracked bounties seen Closed or Cancelled (no more deposits or address links). */
+    terminalBounties: number[];
     /** Payouts seen Processed (terminal). */
     donePayouts: number[];
-    /** Payout id → job id (immutable once the payout exists). */
-    payoutJobs: Record<string, number>;
+    /** Payout id → bounty id (immutable once the payout exists). */
+    payoutBounties: Record<string, number>;
   };
 }
 
@@ -39,7 +41,7 @@ export class Store {
   constructor(private readonly file: string) {
     this.state = existsSync(file)
       ? (JSON.parse(readFileSync(file, "utf8")) as State)
-      : { jobs: {}, reportedOrders: [], submitted: {} };
+      : { bounties: {}, reportedOrders: [], submitted: {} };
   }
 
   /** Atomic write. */

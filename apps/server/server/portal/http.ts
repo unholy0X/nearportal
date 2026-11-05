@@ -1,6 +1,5 @@
 import { STATUSES } from "../../src/workspace/workspace-model.mjs";
 import { deadlineWindow } from "./deadline-window.ts";
-import { ownerAcceptance } from "../tasks/owner-acceptance.ts";
 import { note } from "../tasks/domain.ts";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { TaskService } from "../tasks/service.ts";
@@ -141,9 +140,9 @@ export async function portalRuntime(
   let cryptoReady = false;
   if(tasks.config.mode==="sandbox" && process.env.CRYPTO_USDC_ENABLED==="1") {
     try { const {view}=await import("../chain.ts"); const contract=process.env.CRYPTO_ESCROW_CONTRACT_ID; if(!contract || contract===env.contractId || !contract.endsWith(".testnet")) throw new Error("Isolated crypto contract required");
-      const operator=await view<[string,string]|null>("get_crypto_operator",{},contract);
-      if(operator?.[0]!==process.env.CRYPTO_CLIENT_ACCOUNT_ID || operator?.[1]!==process.env.CRYPTO_VERIFIER_ACCOUNT_ID) throw new Error("Crypto operator mismatch");
-      await view("get_crypto_bounty",{id:"00000000-0000-0000-0000-000000000000"},contract); cryptoReady=true; } catch { /* Fail closed until approved deployment exists. */ }
+      const config=await view<{operators:string[];verifier:string;relayer:string}>("get_config",{},contract);
+      if(!config.operators?.includes(process.env.CRYPTO_CLIENT_ACCOUNT_ID!) || config.verifier!==process.env.CRYPTO_VERIFIER_ACCOUNT_ID || config.relayer!==process.env.CRYPTO_RELAYER_ACCOUNT_ID) throw new Error("Crypto role configuration mismatch");
+      await view("get_bounty",{bounty_id:"00000000-0000-0000-0000-000000000000"},contract); cryptoReady=true; } catch { /* Fail closed until approved deployment exists. */ }
   }
   const cryptoAdapter=cryptoPayments(tasks.store,store);
   const adapters = new Map<string, Promise<PaymentAdapter>>();
@@ -660,20 +659,8 @@ export async function portalRuntime(
           }
         }
         else if (match[2] === "accept-work") {
-          if (b.marketTerms) throw new Error("Deadline bounties are paid only after the agreed checks; CI cannot be waived");
-          if(env.network!=="testnet" || user.id!==b.ownerId || input.confirm!=="ACCEPT MERGED WORK")throw new Error("Only the bounty owner can explicitly accept merged work on testnet");
-          const acceptTask=portal.task(b);if(!acceptTask)throw new Error("Bounty not ready");
-          await tasks.exclusive(`task:${acceptTask.id}`,async()=>{
-            const t=portal.task(store.bounty(b.id));if(!t)throw new Error("Bounty not ready");
-            if(tasks.store.db.prepare("SELECT 1 FROM releases WHERE task_id=?").get(t.id))throw new Error("Release already authorized");
-            const github=portal.userGit(b.ownerId);
-            const pr=await github.get<any>(`/repos/${b.repository}/pulls/${t.prNumber}`);
-            if(!hasTaskMarker(String(pr.body||""),b.code))throw new Error("The PR must retain its bounty identifier");
-            const evidence=await github.evidence(t);
-            const acceptance=ownerAcceptance(t,evidence,user.id,{policyHash:input.policyHash,headSha:input.headSha,mergeSha:input.mergeSha,prNumber:input.prNumber});
-            if(!t.ownerAcceptance){t.ownerAcceptance=acceptance;note(t,`${user.login} explicitly accepted merged PR #${t.prNumber} and authorized the fixed USDC testnet payout; CI checks waived.`);tasks.store.save(t);}
-            tasks.store.enqueue(t.id);
-          });
+          if(user.id!==b.ownerId){json(res,403,{error:"Only the bounty owner can manage this bounty"});return true;}
+          throw new Error("Every developer payout requires the agreed checks and creator merge; CI cannot be waived");
         }
         else if (match[2] === "refresh") {
           const t = portal.task(b);

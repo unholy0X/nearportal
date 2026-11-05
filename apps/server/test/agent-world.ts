@@ -15,7 +15,7 @@ import { PortalStore, digest, type User } from "../server/portal/store.ts";
 import { PortalService } from "../server/portal/service.ts";
 import { MarketStore } from "../server/portal/market-store.ts";
 import { FixedBounties } from "../server/market/fixed.ts";
-import { SimChain } from "../server/market/sim-chain.ts";
+import { simEscrows } from "../server/market/sim-chain.ts";
 import { ReadModel } from "../server/portal/read-model.ts";
 import { RateLimiter, defaultRules } from "../server/portal/rate-limit.ts";
 import { Auth } from "../server/portal/auth.ts";
@@ -41,8 +41,9 @@ export async function agentWorld(options: { path?: string; port?: number; dir?: 
   const portalStore = new PortalStore(tasks.db, dir, KEY);
   for (const u of Object.values(users)) portalStore.saveUser(u);
   const markets = new MarketStore(tasks.db, portalStore);
-  const chain = new SimChain(tasks.db, { now: () => clock.now, funded: (k) => tasks.get(k).funded, escrowCents: (k) => tasks.get(k).policy.amountCents });
-  const payments = new SimulatedPayments(tasks, chain);
+  const escrows = simEscrows(tasks.db, { now: () => clock.now });
+  const chain = escrows.usdc;
+  const payments = new SimulatedPayments(tasks, escrows);
   const service = new TaskService(tasks, new GitHub({}), payments, { mode: "simulation", githubMode: "fixture", verifier: "sim-verifier", recipient: "r" });
 
   // ---- mock GitHub (per user credential) ----
@@ -169,11 +170,11 @@ export async function agentWorld(options: { path?: string; port?: number; dir?: 
   const pass = async (times = 1) => {
     for (let i = 0; i < times; i++) {
       for (const t of tasks.all()) tasks.enqueue(t.id);
-      await service.tick();
+      for (let batch = 0; batch < Math.max(1, Math.ceil(tasks.all().length / service.concurrency)); batch++) await service.tick();
       await portal.tick();
     }
   };
-  const item = (i: number, patch: Record<string, unknown> = {}) => ({ repository: "acme/widgets", title: `Task ${i}: improve module ${i}`, description: `Implement improvement ${i} with tests.`, criteria: [`Criterion ${i}a`, `Criterion ${i}b`], workflowPath: ".github/workflows/acceptance.yml", jobs: ["acceptance"], protectedPaths: ["test/acceptance.test.ts"], rewardUsdc: "25", delivery: { hours: 48 }, clientRef: `item-${i}`, ...patch });
+  const item = (i: number, patch: Record<string, unknown> = {}) => ({ repository: "acme/widgets", title: `Task ${i}: improve module ${i}`, description: `Implement improvement ${i} with tests.`, criteria: [`Criterion ${i}a`, `Criterion ${i}b`], workflowPath: ".github/workflows/acceptance.yml", jobs: ["acceptance"], protectedPaths: ["test/acceptance.test.ts"], rewardUsdc: "25", refundAddress: "0x" + "c1ea2".repeat(8), delivery: { hours: 48 }, clientRef: `item-${i}`, ...patch });
   /** Create, publish and (optionally) fund one USDC fixed bounty through the agent API. */
   const bounty = async (ownerToken: string, patch: Record<string, unknown> = {}, fund = true) => {
     const prep = await call("POST", "/api/agent/v1/prepare", { bearer: ownerToken, body: { items: [item(Math.floor(Math.random() * 1e9), patch)] } });

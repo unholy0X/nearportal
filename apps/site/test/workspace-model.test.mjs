@@ -154,3 +154,8 @@ test('merged PR remains visible as verification pending until a processed paymen
  assert.equal(bountyStatus(b).label,'Merged · verification pending');assert.equal(columnFor(b,'developer'),'review');
  assert.equal(bountyStatus({...b,task:{...b.task,payment:{state:'Processed'}}}).key,'paid');
 });
+
+test('a confirmed dispute refund is never a developer payment or an available bounty',()=>{
+ const b={...base,task:task({funded:true,disputed:true,payment:{state:'NotRequested'},refund:{state:'Processed'}})};
+ const status=bountyStatus(b);assert.equal(status.key,'refunded');assert.equal(status.label,'Refunded');
+});

@@ -30,8 +30,8 @@ test("USDC-only runtime boots without bank keys and publishes USDC independently
     assert.equal(body.method, "query", "no chain mutation during startup or publish");
     assert.equal(body.params.account_id, contract, "no bank-contract dependency");
     const result = body.params.request_type === "view_account" ? { code_hash: "reviewed-fixture-hash" } : {
-      result: [...Buffer.from(JSON.stringify(body.params.method_name === "get_crypto_operator"
-        ? [process.env.CRYPTO_CLIENT_ACCOUNT_ID, process.env.CRYPTO_VERIFIER_ACCOUNT_ID] : null))],
+      result: [...Buffer.from(JSON.stringify(body.params.method_name === "get_config"
+        ? {operators:[process.env.CRYPTO_CLIENT_ACCOUNT_ID],verifier:process.env.CRYPTO_VERIFIER_ACCOUNT_ID,relayer:process.env.CRYPTO_RELAYER_ACCOUNT_ID} : null))],
       logs: [], block_height: 1, block_hash: "11111111111111111111111111111111",
     };
     return Response.json({ jsonrpc: "2.0", id: body.id, result });
@@ -70,7 +70,7 @@ test("USDC-only runtime boots without bank keys and publishes USDC independently
     const response = await fetch(base + path, { method: "POST", headers: { Cookie: cookie, "X-CSRF-Token": csrf, "Content-Type": "application/json" }, body: JSON.stringify(body) });
     return { status: response.status, body: await response.json() as any };
   };
-  const draft = { repository: "owner/test", title: "Rehearsal", description: "Add the fixture", criteria: "Tests pass", amountCents: 1, paymentRail: "base-usdc" };
+  const draft = { repository: "owner/test", title: "Rehearsal", description: "Add the fixture", criteria: "Tests pass", amountCents: 1, paymentRail: "base-usdc", refundAddress: "0x" + "c1ea2".repeat(8) };
   const created = await request("/bounties", draft);
   assert.equal(created.status, 201, JSON.stringify(created.body));
   const published = await request(`/bounties/${created.body.bounty.id}/publish`, { revision: created.body.bounty.revision });

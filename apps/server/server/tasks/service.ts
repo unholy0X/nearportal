@@ -1,4 +1,5 @@
-import { evaluateRelease } from "./owner-acceptance.ts";
+import { address as evmAddress } from "../crypto/evm.ts";
+import { evaluateRelease } from "./release-policy.ts";
 import { evaluateMergePolicy } from "./merge-policy.ts";
 import { randomBytes, randomUUID } from "node:crypto";
 import { evaluate, hash, note, type Task, type TaskPolicy } from "./domain.ts";
@@ -195,7 +196,7 @@ export class TaskService {
       criteria,
       amountCents: amountCents as number,
       currency: input.paymentRail === "base-usdc" ? "USD" : "EUR",
-      ...(input.paymentRail === "base-usdc" ? {paymentRail:"base-usdc" as const} : {}),
+      ...(input.paymentRail === "base-usdc" ? {paymentRail:"base-usdc" as const, refundAddress: evmAddress(input.refundAddress)} : {}),
       repository,
       branch,
       workflowPath,
@@ -314,7 +315,7 @@ export class TaskService {
   claimCrypto(t: Task, developer: {id:number;login:string}, recipient:string, policyHash:unknown) {
     if(t.policy.paymentRail!=="base-usdc" || !t.openBounty || !t.funded || !t.clientAccepted || t.disputed || t.policy.developerId!==0) throw new Error("This crypto bounty is not available to claim");
     if(t.ownerId===developer.id || t.policy.mergerIds.includes(developer.id)) throw new Error("The client cannot claim their own bounty");
-    if(policyHash!==t.policyHash || !/^0x[0-9a-f]{40}$/.test(recipient) || /^0x0{40}$/.test(recipient) || recipient===t.crypto?.address) throw new Error("Review the current crypto payout agreement");
+    if(policyHash!==t.policyHash || !/^0x[0-9a-f]{40}$/.test(recipient) || /^0x0{40}$/.test(recipient) || recipient===t.crypto?.address || recipient===t.policy.refundAddress) throw new Error("Review the current crypto payout agreement");
     validateFundingPolicy(t);
     t.policy.developerId=developer.id; t.policy.developerLogin=developer.login;
     t.policy.recipient=recipient;t.policy.payoutCommitment=hash({developerId:developer.id,rail:"base-usdc",address:recipient});t.policyHash=hash(t.policy);t.developerAccepted=true;
@@ -384,7 +385,7 @@ export class TaskService {
       t.policy.payoutCommitment = payoutCommitment(developer.id, payout);
     } else {
       if (t.policy.paymentRail !== "base-usdc") throw new Error("This bounty pays by bank transfer: save bank payout details");
-      if (!/^0x[0-9a-f]{40}$/.test(destination.address) || /^0x0{40}$/.test(destination.address) || destination.address === t.crypto?.address) throw new Error("Review the USDC payout address");
+      if (!/^0x[0-9a-f]{40}$/.test(destination.address) || /^0x0{40}$/.test(destination.address) || destination.address === t.crypto?.address || destination.address === t.policy.refundAddress) throw new Error("Review the USDC payout address");
       t.policy.recipient = destination.address;
       t.policy.payoutCommitment = hash({ developerId: developer.id, rail: "base-usdc", address: destination.address });
     }
@@ -554,7 +555,6 @@ export class TaskService {
       if (
         !task.clientAccepted ||
         (!task.developerAccepted && !task.openBounty) ||
-        task.disputed ||
         task.payment.state === "Processed"
       ) {
         // A confirmed payment still has to be recorded on the deadline agreement (Paid).
@@ -585,7 +585,8 @@ export class TaskService {
       if (market && !task.disputed) await market.step(task);
       if (task.disputed) {
         this.store.save(task);
-        this.store.done(id);
+        if(task.refund?.state === "Processed") this.store.done(id);
+        else this.store.wait(id, Math.min(60_000,this.waitFor(task)));
         return;
       }
       if (
@@ -600,7 +601,7 @@ export class TaskService {
             ? await this.github.evidence(task)
             : fixtureEvidence(task);
         // Linking a PR that was merged before the mandate was created cannot earn a reward.
-        // CI waivers (owner acceptance) are not part of fixed-deadline agreements.
+        // Every developer payout requires the agreed checks and creator merge.
         const verdict = market ? evaluateMergePolicy(task, evidence) : evaluateRelease(task, evidence);
         if (
           evidence.merged &&
@@ -629,7 +630,7 @@ export class TaskService {
           note(
             task,
             verdict.status === "eligible"
-              ? verdict.authorizationKind === "owner-acceptance" ? "The owner explicitly accepted the merged work; CI checks were waived for this testnet payout." : "The merged PR meets every agreed verification condition."
+              ? "The merged PR meets every agreed verification condition."
               : verdict.reasons.join(" "),
           );
         task.evidence = evidence;
@@ -639,7 +640,7 @@ export class TaskService {
           task.payment.error = null;
           note(
             task,
-            verdict.authorizationKind === "owner-acceptance" ? "USDC release authorized by explicit owner acceptance." : "Automatic release authorized by the accepted policy.",
+            "Automatic release authorized by the accepted policy.",
           );
           // Commit the unique release record (CAS-protected) before any payment call.
           if (market) market.authorize(task, verdict.evidenceHash);
@@ -701,7 +702,7 @@ export class TaskService {
       if (
         t.clientAccepted &&
         (t.developerAccepted || t.openBounty) &&
-        !t.disputed &&
+        t.refund?.state !== "Processed" &&
         t.payment.state !== "Processed" &&
         this.store.ensureQueued(t.id)
       )

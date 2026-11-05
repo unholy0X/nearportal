@@ -568,7 +568,7 @@ export function createAgentApi(deps: AgentDeps) {
       walletRule: "Name one verified wallet explicitly in claim_bounty; it becomes the immutable recipient of this assignment.",
       availability: { claimable: blockers.length === 0, blockers },
       myAssignment: t ? assignmentView(b, t, u.id) : null,
-      refund: { supported: false, note: "The Base Sepolia USDC test escrow has no client refund path in V1 (contract: no refunds)." },
+      refund: { supported: true, address: t?.policy.refundAddress, note: "Only an owner-resolved dispute can refund recorded unspent deposits to the immutable creator address. No automatic refund on assignment expiry." },
     };
   }
 
@@ -697,6 +697,7 @@ export function createAgentApi(deps: AgentDeps) {
     branch: string;
     protectedPaths: string[];
     amountCents: number;
+    refundAddress: string;
     deliveryHours: number;
   }
   async function prepare(u: User, body: Record<string, unknown>) {
@@ -756,7 +757,9 @@ export function createAgentApi(deps: AgentDeps) {
         if (!Number.isSafeInteger(n) || !Number.isSafeInteger(deliveryHours) || deliveryHours < 1 || deliveryHours > 2160) errors.push("delivery: 1 hour to 90 days, whole units.");
       }
       if (r.rail !== undefined && r.rail !== "base-usdc") errors.push("rail: only base-usdc (Base Sepolia test USDC) in V1.");
-      if (r.refundAddress !== undefined) errors.push("refundAddress: not supported. The USDC test escrow has no client refund path in V1.");
+      let refundAddress = "";
+      try { refundAddress = evmAddress(r.refundAddress); }
+      catch { errors.push("refundAddress: enter your Base Sepolia refund wallet. It is fixed before funding."); }
       const allowed = new Set(["repository", "title", "description", "criteria", "workflowPath", "jobs", "protectedPaths", "rewardUsdc", "delivery", "branch", "rail", "refundAddress", "clientRef"]);
       for (const k of Object.keys(r)) if (!allowed.has(k)) errors.push(`${k}: unknown field.`);
       const clientRef = typeof r.clientRef === "string" && /^[\w.:-]{1,64}$/.test(r.clientRef) ? r.clientRef : null;
@@ -788,7 +791,7 @@ export function createAgentApi(deps: AgentDeps) {
           errors.push(`repository: ${/\(404\)/.test(String((e as Error).message)) ? "not found or not visible to your GitHub connection." : (e as Error).message}`);
         }
       }
-      results.push({ input: r, errors, warnings, discoveredJobs, item: errors.length ? null : { index, clientRef, repository, title, description, criteria, workflowPath, job: jobs[0]!, branch, protectedPaths, amountCents, deliveryHours } });
+      results.push({ input: r, errors, warnings, discoveredJobs, item: errors.length ? null : { index, clientRef, repository, title, description, criteria, workflowPath, job: jobs[0]!, branch, protectedPaths, amountCents, refundAddress, deliveryHours } });
     }
     const valid = results.every((x) => x.item);
     const normalized = results.map((x) => x.item!).filter(Boolean);
@@ -845,7 +848,7 @@ export function createAgentApi(deps: AgentDeps) {
           }
           let b = store.find(item.bountyId);
           if (!b) {
-            await portal.create(u, { repository: item.repository, title: item.title, description: item.description, criteria: item.criteria.join("\n"), amountCents: item.amountCents, branch: item.branch, checkName: item.job, workflowPath: item.workflowPath, protectedPaths: item.protectedPaths.join("\n") || item.workflowPath, paymentRail: "base-usdc", marketTerms: { kind: "fixed", deliveryHours: item.deliveryHours } }, undefined, { id: item.bountyId, github });
+            await portal.create(u, { repository: item.repository, title: item.title, description: item.description, criteria: item.criteria.join("\n"), amountCents: item.amountCents, branch: item.branch, checkName: item.job, workflowPath: item.workflowPath, protectedPaths: item.protectedPaths.join("\n") || item.workflowPath, paymentRail: "base-usdc", refundAddress: item.refundAddress, marketTerms: { kind: "fixed", deliveryHours: item.deliveryHours } }, undefined, { id: item.bountyId, github });
             b = store.bounty(item.bountyId);
           }
           item.state = "created";
@@ -855,7 +858,7 @@ export function createAgentApi(deps: AgentDeps) {
               JSON.stringify(b.criteria) === JSON.stringify(item.criteria) && b.branch === item.branch &&
               b.checkName === item.job && b.checkAppId === 15368 && b.workflowPath === item.workflowPath &&
               b.protectedPaths === (item.protectedPaths.join("\n") || item.workflowPath) &&
-              b.paymentRail === "base-usdc" && b.marketTerms?.kind === "fixed" && b.marketTerms.deliveryHours === item.deliveryHours;
+              b.paymentRail === "base-usdc" && b.refundAddress === item.refundAddress && b.marketTerms?.kind === "fixed" && b.marketTerms.deliveryHours === item.deliveryHours;
             if (!sameTerms) throw new AgentError("agreement_changed", "This draft changed since preparation. Restore the prepared terms or prepare a new batch; it was not published.");
             deps.publishGuard(u, b);
             portal.publish(u, b, hash(b));
@@ -936,6 +939,7 @@ export function createAgentApi(deps: AgentDeps) {
         ...reward(b.amountCents),
         exactAmountUnits: (BigInt(b.amountCents) * 10_000n).toString(),
         depositAddress: address,
+        refundAddress: b.refundAddress ?? null,
         addressVerified: Boolean(address),
         simulated: Boolean(instructions?.simulated),
         confirmationsRequired: typeof instructions?.confirmations === "number" ? instructions.confirmations : 12,
@@ -943,7 +947,7 @@ export function createAgentApi(deps: AgentDeps) {
         fundingState: t?.funded ? "confirmed" : address ? "awaiting-deposit" : "not-ready",
         claimsOpen: status.key === "available",
         status,
-        instruction: t?.funded
+        instruction: t?.refund?.state === "Processed" ? "The owner-authorized dispute refund is confirmed. This bounty is closed; do not deposit again." : t?.funded
           ? "Funding confirmed. Claims are open once the bounty shows Available."
           : address
             ? `Send exactly ${usdc(b.amountCents)} USDC (${(BigInt(b.amountCents) * 10_000n).toString()} units, token ${USDC}) on Base Sepolia (chain ${CHAIN_ID}) to ${address}, for this bounty only. Claims open only after ${typeof instructions?.confirmations === "number" ? instructions.confirmations : 12} confirmations and NearPortal's confirmation.`

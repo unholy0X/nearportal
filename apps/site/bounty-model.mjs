@@ -40,7 +40,7 @@ export function freshDraft(template = 'near') {
   return {
     paymentRail: 'bank', template: templates[template] ? template : 'near', repository: '', title: chosen.title,
     description: chosen.description, criteria: chosen.criteria.map(c => ({ ...c })),
-    amount: '100', branch: '', checkName: '', checkAppId: '15368',
+    amount: '100', refundAddress: '', branch: '', checkName: '', checkAppId: '15368',
     workflowPath: '', protectedPaths: '', id: null, code: null,
     // Delivery: 'open' (first qualifying merged PR, no deadline) or 'fixed' (exclusive assignment).
     delivery: 'open', deliveryValue: '48', deliveryUnit: 'hours',
@@ -72,7 +72,7 @@ export function changeDeliveryUnit(draft, unit) {
 export function hydrateDraft(input) {
   const draft = freshDraft(input?.template);
   if (!input || typeof input !== 'object') return draft;
-  for (const field of ['repository', 'title', 'description', 'amount', 'branch', 'checkName', 'checkAppId', 'workflowPath', 'protectedPaths']) {
+  for (const field of ['repository', 'title', 'description', 'amount', 'branch', 'checkName', 'checkAppId', 'workflowPath', 'protectedPaths', 'refundAddress']) {
     if (typeof input[field] === 'string') draft[field] = input[field].slice(0, field === 'description' ? 12000 : 4000);
   }
   if (input.paymentRail === 'base-usdc') draft.paymentRail = 'base-usdc';
@@ -124,6 +124,7 @@ export function draftPayload(draft) {
   if (!draft.branch.trim()) throw new Error('Set the target branch in Advanced options.');
   if (!draft.workflowPath.startsWith('.github/workflows/') || !/\.ya?ml$/.test(draft.workflowPath)) throw new Error('Choose an existing GitHub Actions workflow.');
   if (!draft.checkName.trim()) throw new Error('Enter the required job/check name from that workflow.');
+  if (draft.paymentRail === 'base-usdc' && (!/^0x[0-9a-fA-F]{40}$/.test(draft.refundAddress || '') || /^0x0{40}$/i.test(draft.refundAddress) || draft.refundAddress.toLowerCase() === '0x036cbd53842c5426634e7929541ec2318f3dcf7e')) throw new Error('Enter your Base Sepolia refund wallet.');
   const checkAppId = 15368;
   const protectedPaths = [...new Set([draft.workflowPath, ...draft.protectedPaths.split(/[\n,]+/).map(path => path.trim()).filter(Boolean)])].join('\n');
   if (protectedPaths.length > 4000) throw new Error('Too many protected paths. Remove some additional files.');
@@ -132,7 +133,7 @@ export function draftPayload(draft) {
     criteria: criteriaText(draft), amountCents: euroCents(draft.amount), branch: draft.branch.trim(),
     checkName: draft.checkName.trim(), checkAppId, workflowPath: draft.workflowPath,
     protectedPaths,
-    ...(draft.paymentRail === "base-usdc" ? {paymentRail:"base-usdc"} : {}),
+    ...(draft.paymentRail === "base-usdc" ? {paymentRail:"base-usdc", refundAddress:draft.refundAddress.toLowerCase()} : {}),
     ...(draft.delivery === 'fixed' ? { marketTerms: { kind: 'fixed', deliveryHours: deliveryHours(draft) } } : {}),
   };
 }

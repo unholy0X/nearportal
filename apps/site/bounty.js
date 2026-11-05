@@ -87,7 +87,7 @@ function render() {
   if (b.task?.policy?.verifier) fact(facts, 'Verifier', b.task.policy.verifier);
   $('#agreement-owner').textContent = `@${b.owner} merges to ${b.branch}. ${b.task?.policy?.mergeMethod === "squash" && !b.task?.mergeMethodAmendment ? "This existing agreement requires a squash merge." : "Any GitHub merge method is accepted."}`;
   $('#agreement-check').textContent = `${b.checkName} must succeed on the exact submitted commit, from the agreed workflow.`;
-  $('.release-note span:last-child').textContent=b.task?.ownerAcceptance?'Payment authorized by explicit owner acceptance.':'Paid after passing checks and client merge.'; renderReward(); renderSubmission(); renderActivity(); renderAccess(); renderCheckWarning();
+  $('.release-note span:last-child').textContent='Paid after passing checks and client merge.'; renderReward(); renderSubmission(); renderActivity(); renderAccess(); renderCheckWarning();
   $('#live-label').textContent = state.offline ? 'Connection interrupted · retrying' : 'Live';
 }
 function issueDetail(text) { const p = el('p', 'issue-text', text); return p; }
@@ -101,7 +101,8 @@ function renderIssue(b, status) {
   const last = [...(t?.timeline || [])].pop();
   const canRefresh = ['client', 'developer'].includes(b.role) && pay === 'NotRequested';
   const prLink = () => t?.prNumber && actions.append(link(`Open PR #${t.prNumber} ↗`, `https://github.com/${b.repository}/pull/${t.prNumber}`, 'ui-button ui-button-secondary'));
-  if (t?.disputed) { title.textContent = 'Release paused'; body.append(issueDetail('A dispute is open. No payment is released until it is resolved.')); }
+  if (t?.refund) { title.textContent = t.refund.state === 'Processed' ? 'Refunded to the creator' : 'Dispute refund processing'; body.append(issueDetail(t.refund.state === 'Processed' ? 'The confirmed refund returned the recorded unspent deposit to the fixed creator wallet. No developer reward was paid.' : 'The owner authorized a refund to the destination fixed before funding. Waiting for confirmation.')); if(/^https:\/\/sepolia\.basescan\.org\/tx\/0x[a-f0-9]{64}$/i.test(t.refund.reference || '')) actions.append(link('View refund receipt ↗', t.refund.reference, 'ui-button ui-button-secondary')); }
+  else if (t?.disputed) { title.textContent = 'Release paused'; body.append(issueDetail('A dispute is open. No payment is released until it is resolved.')); }
   else if (pay === 'NeedsAttention') { title.textContent = 'Payment needs attention'; body.append(issueDetail(t.payment.error || 'The payout could not be confirmed. The payment reference and activity record its progress.')); }
   else if (t?.verdict?.status === 'blocked') {
     const reasons = t.verdict.reasons || [];
@@ -367,7 +368,7 @@ function renderSubmission() {
     // Blocking reasons are shown once, in the issue card at the top.
     if (t.verdict?.status !== 'blocked') {
       const passed=t.verdict?.status==='eligible'||t.payment?.state==='Processed';
-      content.append(el('p','pr-verification-state',t.payment?.state==='Processed'?'Payment confirmed':passed?(t.verdict?.authorizationKind==='owner-acceptance'?'Owner accepted · CI requirement waived':'Verification passed'):t.evidence?.merged?'Merged · verification pending':'Verification pending'));
+      content.append(el('p','pr-verification-state',t.payment?.state==='Processed'?'Payment confirmed':passed?'Verification passed':t.evidence?.merged?'Merged · verification pending':'Verification pending'));
       if(!passed && t.verdict?.reasons?.length){const reasons=el('ul','pr-pending-reasons');t.verdict.reasons.forEach(reason=>reasons.append(el('li','',reason)));content.append(reasons);}
       else if(!passed)content.append(el('p','read-only-notice','Retrieving the latest GitHub verification results.'));
       if(!passed)content.append(el('p','read-only-notice','Funds remain secured until the agreed checks and merge conditions pass.'));
@@ -385,12 +386,6 @@ function renderSubmission() {
     content.append(link('Open code editor ↗',editorUrl(b),'ui-button'),el('p','read-only-notice','Create a work branch in the editor, make your changes, then Commit & Push.'),link('Create PR on GitHub ↗',pullRequestUrl(b),'ui-button ui-button-secondary'),el('p', 'read-only-notice', 'Select the branch containing your changes. The title and bounty identifier are prefilled. NearPortal tracks your PR automatically.'));
     content.append(pullRequestForm(b,null,'Link PR',number=>action('pr',{number}),true));
   } else content.append(el('p', 'read-only-notice', t.policy.developerId ? 'Waiting for the assigned contributor’s PR.' : 'A contributor must claim this bounty before submitting a PR.'));
-  if(b.role==='client'&&b.paymentRail==='base-usdc'&&t.evidence?.merged&&!t.disputed&&t.payment?.state==='NotRequested'&&!t.ownerAcceptance){
-    const acceptance=el('div','owner-acceptance');acceptance.append(el('h3','','Accept merged work'),el('p','read-only-notice',`Owner acceptance can authorize the fixed ${money(b.amountCents)} testnet payment without the CI result. The original check result remains recorded.`));
-    acceptance.append(button(`Accept work & pay ${money(b.amountCents)}`,()=>{
-      if(confirm(`Accept PR #${t.prNumber} and authorize ${money(b.amountCents)} on Base Sepolia to the developer's verified wallet?\n\nPayout: ${t.policy.recipient}\nMerge: ${t.evidence.mergeSha}\n\nThe CI requirement is waived for this testnet payment. The original agreement and other checks remain unchanged.`))action('accept-work',{confirm:'ACCEPT MERGED WORK',policyHash:t.policyHash,headSha:t.evidence.headSha,mergeSha:t.evidence.mergeSha,prNumber:t.prNumber});
-    },'ui-button'));content.append(acceptance);
-  }
   if (['client', 'developer'].includes(b.role) && t.payment?.state === 'NotRequested' && t.verdict?.status !== 'blocked') content.append(button(state.busy?'Requesting…':'Refresh verification', () => action('refresh'), 'ui-button ui-button-secondary'));
 }
 function renderActivity() {

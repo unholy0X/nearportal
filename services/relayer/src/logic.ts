@@ -25,31 +25,15 @@ export function amountFromMessage(message: string): string {
   return match[1];
 }
 
-export type JobState = "VerifyingAddress" | "AwaitingClient" | "Signed" | "Funded" | "Disputed" | "Closed" | "Cancelled";
-
-export interface JobView {
-  state: JobState;
-  off_premises: boolean;
-  signed_at_ns: number | null;
-  deposited_cents: number;
-  milestones: { amount_cents: number }[];
-}
-
-export const COOLING_OFF_MS = 7 * 24 * 3600 * 1000;
+export type BountyState = "VerifyingAddress" | "AwaitingDeposit" | "Funded" | "Disputed" | "Closed" | "Cancelled";
 
 /**
- * Decides how an incoming Monerium issue order (SEPA in) is reported to the contract:
- * as a deposit when the contract will accept it, otherwise as excess for the mediator.
+ * Whether an incoming Monerium issue order (SEPA in) can be reported to the contract. The
+ * contract decides the allocation (reward first, the rest is surplus refunded to the client);
+ * it refuses deposits only before the escrow address is verified or after it was rejected.
  */
-export function classifyIncoming(job: JobView, amountCents: number, nowMs: number): "deposit" | "excess" | "ignore" {
-  if (job.state === "VerifyingAddress") return "ignore";
-  if (job.state !== "Signed") return "excess";
-  if (job.off_premises) {
-    const signedAtMs = (job.signed_at_ns ?? 0) / 1e6;
-    if (nowMs < signedAtMs + COOLING_OFF_MS) return "excess";
-  }
-  const escrow = job.milestones.reduce((sum, m) => sum + m.amount_cents, 0);
-  return job.deposited_cents + amountCents <= escrow ? "deposit" : "excess";
+export function acceptsDeposits(state: BountyState): boolean {
+  return state !== "VerifyingAddress" && state !== "Cancelled";
 }
 
 export interface Party {
@@ -62,13 +46,17 @@ export interface Party {
   country: string;
 }
 
-/** Finds which party a payout goes to by matching the signed short IBAN. */
-export function payeeFor(shortTarget: string, artisan: Party, client: Party): Party {
-  const matches = [artisan, client].filter((p) => shortIban(p.iban) === shortTarget);
-  if (matches.length !== 1) {
-    throw new Error(`Short IBAN ${shortTarget} matches ${matches.length} known parties`);
+/**
+ * Finds the party a payout goes to. A developer payout pays the active assignment's recipient;
+ * a dispute refund or a surplus refund pays the client. The signed short IBAN must match.
+ */
+export function payeeFor(payout: { kind: "Developer" | "Refund" | "SurplusRefund"; short_iban: string }, parties: { developer?: Party; client: Party }): Party {
+  const payee = payout.kind === "Developer" ? parties.developer : parties.client;
+  if (!payee) throw new Error(`No registered ${payout.kind === "Developer" ? "developer" : "client"} for payout to ${payout.short_iban}`);
+  if (shortIban(payee.iban) !== payout.short_iban) {
+    throw new Error(`Short IBAN ${payout.short_iban} does not match the registered ${payout.kind === "Developer" ? "developer" : "client"}`);
   }
-  return matches[0]!;
+  return payee;
 }
 
 /** Monerium counterpart object for a redeem order. */

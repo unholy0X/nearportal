@@ -33,10 +33,10 @@ export function createDemoTreasury(tasks: TaskService, store: PortalStore) {
             throw new Error('Bounty must have an accepted, unfunded sandbox escrow');
         const { view, invalidateViews } = await import('../chain.ts');
         invalidateViews();
-        const job = await view<any>('get_job', { job_id: t.jobId });
-        if (job?.excess_recorded_cents > 0)
+        const job = await view<any>('get_bounty', { bounty_id: String(t.jobId) });
+        if (BigInt(job?.surplus_recorded_cents ?? "0") > 0n)
             throw new Error('This escrow contains an earlier excess deposit. Reconcile that deposit before adding demo-wallet funds. No new transfer was sent.');
-        if (!job || job.state !== 'Signed' || job.deposited_cents !== 0 || job.terms_hash !== (t.fundingPolicyHash ?? t.policyHash) || typeof job.link !== 'object' || !job.link.Signed)
+        if (!job || job.state !== 'AwaitingDeposit' || job.deposited_cents !== '0' || job.funding_policy_hash !== (t.fundingPolicyHash ?? t.policyHash) || typeof job.link !== 'object' || !job.link.Signed)
             throw new Error('Escrow is not ready for an exact wallet deposit');
         return { bountyId: b.id, taskId: t.id, ownerId, jobId: t.jobId, amountCents: t.policy.amountCents, policyHash: t.fundingPolicyHash ?? t.policyHash, address: job.escrow_evm_address };
     }

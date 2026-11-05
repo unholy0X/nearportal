@@ -38,6 +38,8 @@ export interface User extends Identity {
 }
 export interface Bounty {
   paymentRail?: "base-usdc";
+  /** Client destination, fixed in the funding agreement before deposits. */
+  refundAddress?: string;
   marketTerms?: import("./market.ts").MarketTerms;
   id: string;
   code: string;

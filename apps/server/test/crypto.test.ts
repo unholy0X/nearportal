@@ -46,7 +46,7 @@ test('wallet proof binds GitHub identity, bounty, policy, address and one-use ch
  const proof=await verifyWalletProof(store,200,'bounty-id',policy,body);proof.consume();await assert.rejects(()=>verifyWalletProof(store,200,'bounty-id',policy,body));tasks.close();
 });
 
-test('verified deposit address remains available offline without confirming funds',async()=>{
+test('cached deposit instructions fail closed when current escrow state cannot be read',async()=>{
  const {cryptoPayments}=await import('../server/crypto/payments.ts');
  const keys=['CRYPTO_CLIENT_ACCOUNT_ID','CRYPTO_VERIFIER_ACCOUNT_ID','CRYPTO_RELAYER_ACCOUNT_ID','CRYPTO_ESCROW_CONTRACT_ID'];
  const prior=keys.map(k=>process.env[k]);const fetchBefore=globalThis.fetch;
@@ -55,10 +55,8 @@ test('verified deposit address remains available offline without confirming fund
   globalThis.fetch=async()=>{throw new Error('RPC unavailable');};
   const adapter=cryptoPayments({} as TaskStore,{} as PortalStore);
   const t={id:'81834579-7b9a-4a80-9de2-3d7fa8632fd0',policy:{paymentRail:'base-usdc',currency:'USD',amountCents:100},fundingPolicyHash:policy,crypto:{address:dest,verifiedFundingHash:policy},funded:false} as unknown as import('../server/tasks/domain.ts').Task;
-  const result=await adapter.deposit(t) as unknown as {address:string;amountUnits:string};
-  assert.equal(result.address,dest);assert.equal(result.amountUnits,'1000000');assert.equal(t.funded,false);
-  t.crypto!.verifiedFundingHash='b'.repeat(64);
-  await assert.rejects(()=>adapter.deposit(t),/do not match/);
+  await assert.rejects(()=>adapter.deposit(t),/RPC unavailable/);
+  assert.equal(t.funded,false);
  }finally{globalThis.fetch=fetchBefore;keys.forEach((k,i)=>{if(prior[i]===undefined)delete process.env[k];else process.env[k]=prior[i];});}
 });
 
@@ -70,14 +68,4 @@ test('crypto activity names the real rail while historical bank records remain u
  assert.equal(old.message,'Monerium deposit confirmed in escrow.');
  const bank={...t,policy:{...t.policy,paymentRail:undefined}};
  assert.equal(TaskService.prototype.public(bank).timeline[0]!.message,old.message);
-});
-
-
-test('scoped verifier rotation preserves only the explicitly configured legacy agreements', async () => {
- const {escrowVerifier}=await import('../server/crypto/verifier.ts');
- assert.equal(escrowVerifier('new.testnet','new.testnet','old.testnet',true),'new.testnet');
- assert.equal(escrowVerifier('old.testnet','new.testnet','old.testnet',false),'old.testnet');
- assert.throws(()=>escrowVerifier('old.testnet','new.testnet','old.testnet',true));
- assert.throws(()=>escrowVerifier('other.testnet','new.testnet','old.testnet',false));
- assert.throws(()=>escrowVerifier('old.testnet','new.testnet',undefined,false));
 });

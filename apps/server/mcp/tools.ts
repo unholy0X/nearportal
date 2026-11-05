@@ -214,6 +214,7 @@ export function registerTools(server: McpServer, client: NearPortalClient) {
     jobs: z.array(z.string().min(1).max(200)).length(1).describe("Exactly one job name, as reported by the workflow's runs"),
     protectedPaths: z.array(z.string().regex(/^[\w./-]{1,300}$/)).max(20).optional(),
     rewardUsdc: USDC,
+    refundAddress: z.string().regex(/^0x[0-9a-fA-F]{40}$/).describe("Creator refund wallet on Base Sepolia, fixed before funding; must differ from the developer wallet"),
     delivery: z.union([z.object({ hours: z.number().int().min(1).max(2160) }).strict(), z.object({ days: z.number().int().min(1).max(90) }).strict()]),
     branch: z.string().min(1).max(200).optional(),
     clientRef: z.string().regex(/^[\w.:-]{1,64}$/).optional(),

@@ -20,7 +20,7 @@ import type { TaskService } from "../tasks/service.ts";
 import type { Task, PrEvidence, Verdict } from "../tasks/domain.ts";
 import { note } from "../tasks/domain.ts";
 import { hasTaskMarker } from "../portal/judge.ts";
-import type { MarketRail } from "./rail.ts";
+import { deliverySeconds, type MarketRail } from "./rail.ts";
 import type { Bounty, User } from "../portal/store.ts";
 import { log } from "../ops/log.ts";
 import { metrics } from "../ops/metrics.ts";
@@ -34,7 +34,8 @@ export interface FixedDeps {
   environment: string;
   now?: () => number;
 }
-const definite = (e: unknown) => /Assignment generation mismatch|Developer already bound|Uncommitted funded bounty required|Fixed reward cannot change|Recipient matches client refund|Invalid short IBAN|Invalid recipient|Funding policy mismatch|No bounty market|No crypto market|Funded crypto bounty required/.test(String((e as Error)?.message ?? e));
+// Definite refusals of `assign_developer` (contracts/common/src/errors.rs): nothing was bound.
+const definite = (e: unknown) => /Assignment generation mismatch|Developer already bound|Funded unsettled bounty required|Recipient matches client refund|Invalid short IBAN|Invalid recipient|No such bounty|Invalid assignment hash/.test(String((e as Error)?.message ?? e));
 
 export class FixedBounties {
   readonly now: () => number;
@@ -143,17 +144,13 @@ export class FixedBounties {
     const rail = await this.deps.rail(t);
     if (!rail) throw new Error("No payment rail supports deadline bounties for this task");
     if (m.phase === "paused") return;
-    // 0. The deadline terms must be on the escrow before funding (bank: configured in prepare
-    // before acceptance; USDC: before a deposit address is shown).
+    // 0. The deadline terms are fixed by `create_bounty` before any deposit address is shown.
     if (m.phase === "unfunded") {
-      if (!(await rail.read(t))) {
-        try {
-          await rail.configure(t);
-        } catch (error) {
-          if (!/not been created/.test(String((error as Error)?.message))) throw error;
-          return;
-        }
-        if (!(await rail.read(t))) return;
+      const created = await rail.read(t);
+      if (!created) return;
+      if (created.deliverySeconds !== deliverySeconds(t)) {
+        this.deps.markets.applyLatest(bountyId, { type: "pause" }, this.now());
+        throw new Error("The escrow's delivery window differs from the funded terms; paused for review");
       }
       // 1. Funding: only the exact confirmed deposit opens claims; surplus is tracked by the rail.
       if (!t.funded) return;
@@ -176,7 +173,7 @@ export class FixedBounties {
     // 3. Assignment binding: reconcile, then (re)send; generations make repetition harmless.
     if (!a.confirmedAt) {
       if (onChain && onChain.generation === a.generation) {
-        if (onChain.developerId !== a.userId || onChain.policyHash !== t.policyHash) {
+        if (onChain.developerId !== a.userId || onChain.policyHash !== t.policyHash || onChain.deadlineMs === null) {
           this.deps.markets.applyLatest(bountyId, { type: "pause" }, this.now());
           throw new Error("The escrow holds a different assignment than this bounty; paused for review");
         }
@@ -192,7 +189,7 @@ export class FixedBounties {
         throw new Error("The escrow assignment generation does not match; paused for review");
       }
       try {
-        await rail.bind(t, { generation: a.generation, developerId: a.userId, rewardCents: a.rewardCents, policyHash: t.policyHash });
+        await rail.bind(t, { generation: a.generation, developerId: a.userId, policyHash: t.policyHash });
       } catch (error) {
         // Re-read: a timeout may still have bound the assignment. Only a definite refusal reopens.
         const after = await rail.read(t).catch(() => null);
@@ -226,10 +223,11 @@ export class FixedBounties {
       this.deps.markets.applyLatest(bountyId, { type: "pause" }, this.now());
       throw new Error("The confirmed assignment is missing from the escrow; paused for review");
     }
-    // 4. Relay the timely submission (received <= deadline) within the bounded grace. A head
-    // updated before the deadline is relayed the same way; the chain keeps the latest timely one.
+    // 4. Relay the timely submission (received <= deadline) within the bounded grace (both rails
+    // refuse it later). A head updated before the deadline is relayed the same way; the chain
+    // keeps the latest timely one.
     if (a.submission && onChain.headSha !== a.submission.headSha && t.marketSubmission?.headSha === a.submission.headSha) {
-      if (rail.rail === "bank" && this.now() > a.deadline + MARKET_RELAY_GRACE_MS) throw new Error("A timely submission could not be recorded on chain within the relay window; manual review required (not the developer's fault)");
+      if (this.now() > a.deadline + MARKET_RELAY_GRACE_MS) throw new Error("A timely submission could not be recorded on chain within the relay window; manual review required (not the developer's fault)");
       try {
         await rail.recordSubmission(t, { generation: a.generation, policyHash: t.policyHash, headSha: a.submission.headSha, observedAtMs: a.submission.receivedAt });
       } catch (error) {
@@ -273,7 +271,7 @@ export class FixedBounties {
         await rail.expire(t, a.generation);
       } catch (error) {
         // The chain clock may trail the server clock; an uncertain outcome is re-read below.
-        if (!/window still open|No active assignment|Assignment mismatch/.test(String((error as Error)?.message))) {
+        if (!/window still open|No active assignment|Assignment generation mismatch/.test(String((error as Error)?.message))) {
           const check = await rail.read(t).catch(() => null);
           if (check?.assignment) throw error;
         }

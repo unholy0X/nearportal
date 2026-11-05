@@ -717,7 +717,7 @@ test("HTTP portal exposes published briefs publicly while protecting drafts, cla
     assert.equal((await call(`/bounties/${b.id}/accept-work`, contributor, {confirm:"ACCEPT MERGED WORK"})).status,403);
     tasks.db.prepare("INSERT INTO releases VALUES(?,?,?)").run(task.id,"pinned",new Date().toISOString());
     const duplicate=await call(`/bounties/${b.id}/accept-work`,client,{confirm:"ACCEPT MERGED WORK"});
-    assert.equal(duplicate.status,400);assert.match(duplicate.data.error,/already authorized/);
+    assert.equal(duplicate.status,400);assert.match(duplicate.data.error,/CI cannot be waived/);
     tasks.db.prepare("DELETE FROM releases WHERE task_id=?").run(task.id);
     const anonymous = await call(`/bounties/${b.id}`);
     assert.equal(anonymous.status, 200);
@@ -1141,7 +1141,7 @@ test("discovery errors recorded before ownership tracking clear once no job owns
 
 test("USDC draft and funded policy preserve currency and lock the crypto destination at claim",async()=>{
  const {portal,store,tasks,service}=setup();
- const created=await portal.create(owner,{...draft,paymentRail:'base-usdc'});
+ const created=await portal.create(owner,{...draft,paymentRail:'base-usdc',refundAddress:'0x'+'c1ea2'.repeat(8)});
  const b=store.bounty(created.id);assert.equal(b.paymentRail,'base-usdc');portal.publish(owner,b);await portal.tick();
  const task=tasks.get(store.bounty(b.id).taskId!);assert.equal(task.policy.currency,'USD');assert.equal(task.policy.paymentRail,'base-usdc');
  service.fund(task);const funded=tasks.get(task.id);const policy=funded.policyHash;

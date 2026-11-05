@@ -32,10 +32,12 @@ export function incomingTransfers(logs: {address:string;data:Hex;topics:readonly
   }
   return result;
 }
-export async function signedPayout(unsigned: Hex, signature: Hex, expected: {escrow:string;recipient:string;cents:number}) {
+export async function signedPayout(unsigned: Hex, signature: Hex, expected: {escrow:string;recipient:string} & ({cents:number;units?:never}|{units:bigint;cents?:never})) {
   const {parseTransaction}=await import('viem');
   const tx=parseTransaction(unsigned);
-  const expectedData=encodeFunctionData({abi:erc20Abi,functionName:'transfer',args:[address(expected.recipient),centsToUnits(expected.cents)]});
+  const units=expected.units??centsToUnits(expected.cents!);
+  if(units<=0n||units>0xffff_ffff_ffff_ffffn)throw new Error('Invalid authorized USDC amount');
+  const expectedData=encodeFunctionData({abi:erc20Abi,functionName:'transfer',args:[address(expected.recipient),units]});
   if(tx.type!=='eip1559'||tx.chainId!==CHAIN_ID||tx.nonce!==0||tx.to?.toLowerCase()!==USDC||tx.value!==undefined&&tx.value!==0n||tx.data!==expectedData||tx.gas!==120000n||!tx.maxFeePerGas||tx.maxFeePerGas>100000000000n||tx.maxPriorityFeePerGas===undefined||tx.maxPriorityFeePerGas>tx.maxFeePerGas) throw new Error('Contract payout transaction does not match the accepted USDC agreement');
   if(!/^0x[0-9a-f]{130}$/i.test(signature)) throw new Error('Invalid MPC signature');
   const v=Number.parseInt(signature.slice(-2),16);

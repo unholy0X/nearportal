@@ -1,3 +1,4 @@
+import { address as evmAddress } from "../crypto/evm.ts";
 import { randomUUID, randomBytes } from "node:crypto";
 import { marketTerms } from "./market.ts";
 import { requireMarketRollout } from "./market-rollout.ts";
@@ -214,6 +215,7 @@ export class PortalService {
     if (input.paymentRail !== undefined && input.paymentRail !== "bank" && input.paymentRail !== "base-usdc") throw new Error("Choose bank or Base Sepolia USDC payment");
     const rail = input.paymentRail ?? existing?.paymentRail;
     if (rail !== "base-usdc" && !bankPaymentsEnabled()) throw new Error(BANK_DISABLED_MESSAGE);
+    const refundAddress = rail === "base-usdc" ? evmAddress(input.refundAddress ?? existing?.refundAddress) : undefined;
     const amount = Number(input.amountCents);
     if (!Number.isSafeInteger(amount) || amount < 1 || amount > 100_000)
       throw new Error("Sandbox rewards must be €0.01–€1,000");
@@ -238,7 +240,7 @@ export class PortalService {
       description: text("description", 12000),
       criteria,
       amountCents: amount,
-      ...(rail === "base-usdc" ? {paymentRail:"base-usdc" as const} : {}),
+      ...(rail === "base-usdc" ? {paymentRail:"base-usdc" as const, refundAddress} : {}),
       ...(versionedTerms ? { marketTerms: versionedTerms } : {}),
       branch: text("branch", 200, repo.default_branch),
       checkName: text("checkName", 200, "acceptance"),
@@ -371,7 +373,7 @@ export class PortalService {
                     description: b.description,
                     criteria: b.criteria.join("\n"),
                     amountCents: b.amountCents,
-                    ...(b.paymentRail ? {paymentRail:b.paymentRail} : {}),
+                    ...(b.paymentRail ? {paymentRail:b.paymentRail, refundAddress:b.refundAddress} : {}),
                     repository: b.repository,
                     branch: b.branch,
                     maintainer: u.login,
