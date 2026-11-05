@@ -22,3 +22,6 @@ pub enum DisputeOutcome {
     /// Return the deposit to the client's refund destination fixed at creation.
     Refund,
 }
+
+#[cfg(test)]
+mod tests;
