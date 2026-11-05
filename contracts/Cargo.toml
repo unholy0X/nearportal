@@ -1,0 +1,27 @@
+[workspace]
+resolver = "2"
+members = ["common"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.86"
+license = "MIT"
+repository = "https://github.com/unholy0X/nearportal"
+publish = false
+
+[workspace.dependencies]
+# "unstable" only exposes env::ecrecover (the host function is part of the stable protocol).
+near-sdk = { version = "=5.27.0", features = ["unstable"] }
+hex = { version = "0.4.3", default-features = false, features = ["alloc"] }
+bs58 = { version = "0.5.1", default-features = false, features = ["alloc"] }
+k256 = { version = "0.13", features = ["ecdsa"] }
+nearportal-common = { path = "common" }
+
+[profile.release]
+codegen-units = 1
+opt-level = "z"
+lto = true
+debug = false
+panic = "abort"
+overflow-checks = true
