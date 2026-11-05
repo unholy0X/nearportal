@@ -10,6 +10,7 @@
 //! the reward ceiling, the frozen reward, recipient and verifier, generations and deadlines,
 //! and single settlement.
 
+mod assignment;
 mod bounty;
 mod payout;
 mod types;
