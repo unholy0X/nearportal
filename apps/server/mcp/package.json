@@ -1,0 +1,18 @@
+{
+  "name": "nearportal-mcp",
+  "version": "0.1.0",
+  "description": "Connect a coding agent to NearPortal GitHub bounties on Base Sepolia testnet.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "homepage": "https://nearportal.com/mcp",
+  "engines": { "node": ">=22.18" },
+  "bin": { "nearportal-mcp": "./nearportal-mcp.mjs" },
+  "files": ["nearportal-mcp.mjs", "cli.ts", "client.ts", "credentials.ts", "tools.ts", "LICENSE", "README.md"],
+  "keywords": ["mcp", "nearportal", "bounties", "github", "near", "testnet"],
+  "publishConfig": { "access": "public", "registry": "https://registry.npmjs.org/" },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "tsx": "4.20.6",
+    "zod": "4.6.7"
+  }
+}

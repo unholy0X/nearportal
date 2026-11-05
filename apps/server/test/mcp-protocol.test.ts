@@ -14,7 +14,8 @@ import { agentWorld, users, type AgentWorld } from "./agent-world.ts";
 import { NearPortalClient, normalizeServer, ApiError } from "../mcp/client.ts";
 import { TOOL_NAMES } from "../mcp/tools.ts";
 
-const BIN = resolve(import.meta.dirname, "../mcp/nearportal-mcp.mjs");
+// Reuse the same isolated protocol/flow checks against a freshly installed npm tarball.
+const BIN = process.env.NEARPORTAL_TEST_MCP_BIN ?? resolve(import.meta.dirname, "../mcp/nearportal-mcp.mjs");
 const KEY_RE = /npa_[A-Za-z0-9_-]{43}/;
 
 async function connected(w: AgentWorld, who: string, scopes?: string[]) {
