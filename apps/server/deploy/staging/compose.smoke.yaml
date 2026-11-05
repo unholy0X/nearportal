@@ -1,0 +1,55 @@
+# Disposable staging stack for the container smoke test: simulation payments, fixture GitHub,
+# throwaway volume, no credentials, nothing reachable except Caddy on 127.0.0.1:8443.
+services:
+  nearportal:
+    image: ${NEARPORTAL_IMAGE:-nearportal:demo}
+    init: true
+    environment:
+      NODE_ENV: production
+      NEARPORTAL_HOSTED: "1"
+      HOST: 0.0.0.0
+      PORT: 8787
+      DATA_DIR: /var/lib/nearportal
+      SITE_DIR: /workspace/landing
+      APP_ORIGIN: https://nearportal.test
+      TASK_PAYMENT_MODE: simulation
+      TASK_GITHUB_MODE: fixture
+      TASK_ADMIN_TOKEN: smoke-admin-token
+      METRICS_TOKEN: smoke-metrics-token
+      PORTAL_ENCRYPTION_KEY: ${SMOKE_KEY:?}
+      GITHUB_OAUTH_CLIENT_ID: smoke-client-id
+      GITHUB_OAUTH_CLIENT_SECRET: smoke-client-secret
+      GITHUB_WEBHOOK_SECRET: smoke-webhook-secret
+      TRUSTED_PROXIES: 172.31.251.10
+      PORTAL_LOCAL_PREVIEW: "0"
+      GITHUB_USE_CLI: "0"
+    expose:
+      - "8787"
+    networks:
+      edge:
+        ipv4_address: 172.31.251.20
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/lib/nearportal:uid=1000,gid=1000
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+  proxy:
+    image: caddy:2-alpine
+    ports:
+      - "127.0.0.1:8443:443"
+    networks:
+      edge:
+        ipv4_address: 172.31.251.10
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on:
+      nearportal:
+        condition: service_healthy
+networks:
+  edge:
+    ipam:
+      config:
+        - subnet: 172.31.251.0/24

@@ -1,0 +1,47 @@
+# Single NearPortal instance (SQLite queue + payment workers): keep exactly ONE replica.
+# Built from the repository root; the image bundles apps/site.
+services:
+  nearportal:
+    build:
+      context: ../..
+      dockerfile: apps/server/Dockerfile
+    image: nearportal:demo
+    restart: unless-stopped
+    init: true
+    env_file: .env.production
+    environment:
+      NODE_ENV: production
+      NEARPORTAL_HOSTED: "1"
+      HOST: 0.0.0.0
+      PORT: 8787
+      DATA_DIR: /var/lib/nearportal
+      SITE_DIR: /workspace/landing
+      NEAR_CREDENTIALS_DIR: /run/nearportal-keys
+      PORTAL_LOCAL_PREVIEW: "0"
+      GITHUB_USE_CLI: "0"
+      # Only the edge proxy below may set X-Forwarded-For.
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-172.31.250.10}
+    # Not published: only the proxy on the internal network reaches the app.
+    expose:
+      - "8787"
+    networks:
+      edge:
+        ipv4_address: 172.31.250.20
+    volumes:
+      - portal-data:/var/lib/nearportal
+      - ${NEAR_KEYS_PATH:?Set NEAR_KEYS_PATH to the sandbox key directory}:/run/nearportal-keys:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    stop_grace_period: 45s
+networks:
+  edge:
+    ipam:
+      config:
+        - subnet: 172.31.250.0/24
+volumes:
+  portal-data:

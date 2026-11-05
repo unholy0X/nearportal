@@ -1,0 +1,18 @@
+# Public edge for the single NearPortal origin. Caddy replaces any client-supplied
+# X-Forwarded-For with the real peer address (no trusted upstream proxies configured here).
+{$PORTAL_DOMAIN} {
+  encode zstd gzip
+  # Operational endpoints are reachable only from inside the network.
+  @internal path /api/ops/*
+  respond @internal 404
+  request_body {
+    max_size 2MB
+  }
+  header -Server
+  reverse_proxy nearportal:8787 {
+    header_up X-Request-Id {http.request.uuid}
+    transport http {
+      response_header_timeout 35s
+    }
+  }
+}

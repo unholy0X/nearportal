@@ -1,0 +1,14 @@
+# Staging smoke test: same edge rules, locally issued certificate for nearportal.test.
+nearportal.test {
+  tls internal
+  encode zstd gzip
+  @internal path /api/ops/*
+  respond @internal 404
+  request_body {
+    max_size 2MB
+  }
+  header -Server
+  reverse_proxy nearportal:8787 {
+    header_up X-Request-Id {http.request.uuid}
+  }
+}
