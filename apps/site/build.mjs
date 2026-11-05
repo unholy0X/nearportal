@@ -1,4 +1,5 @@
-import { cp, mkdir, rm, stat } from 'node:fs/promises';
+import { cp, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 const root = new URL('./', import.meta.url);
 const out = new URL('dist/', root);
@@ -8,4 +9,18 @@ for (const file of ['mcp.html', 'mcp.css', 'mcp.js', 'terms.html', 'privacy.html
 for (const file of ['public/fonts/manrope.ttf', 'public/fonts/inter.ttf', 'public/fonts/ibm-plex-mono.ttf', 'public/art/aurora-v1/hero-desktop-1600.webp', 'public/art/aurora-v1/hero-mobile-800.webp']) {
   if (!(await stat(new URL(file, out))).size) throw new Error(`Missing asset: ${file}`);
 }
-console.log(`Static landing built: ${fileURLToPath(out)}`);
+// Version local scripts and stylesheets so a deploy is picked up immediately: the edge may keep
+// unversioned assets in browsers for hours. One build-wide hash keeps every shared module on a
+// single URL, so pages never load two copies of the same module.
+const names = (await readdir(out)).filter(name => /\.(?:html|m?js|css)$/.test(name));
+const versioned = names.filter(name => /\.(?:m?js|css)$/.test(name));
+const hash = createHash('sha256');
+for (const name of names.sort()) hash.update(name).update('\0').update(await readFile(new URL(name, out)));
+const version = hash.digest('hex').slice(0, 12);
+const pattern = new RegExp(`((?:src|href)="|from '|import\\(')/(${versioned.map(name => name.replace(/[.]/g, '\\.')).join('|')})(?=["'])`, 'g');
+for (const name of names) {
+  const file = new URL(name, out), source = await readFile(file, 'utf8');
+  const stamped = source.replace(pattern, `$1/$2?v=${version}`);
+  if (stamped !== source) await writeFile(file, stamped);
+}
+console.log(`Static landing built: ${fileURLToPath(out)} (assets ?v=${version})`);
