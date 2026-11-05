@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["common"]
+members = ["common", "escrow"]
 
 [workspace.package]
 version = "0.1.0"

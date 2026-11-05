@@ -1,0 +1,28 @@
+[package]
+name = "nearportal-escrow"
+description = "NearPortal bank-rail bounty escrow: Monerium sandbox EURe held on an MPC-derived address, paid by NEAR Chain Signatures."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[package.metadata.near.reproducible_build]
+image = "sourcescan/cargo-near:0.20.3-rust-1.86.0"
+image_digest = "sha256:a84b7c401a856b6bbbe1975f235b6a8011540a24dfbde248531cccb4b2fdbadf"
+passed_env = []
+container_build_command = ["cargo", "near", "build", "non-reproducible-wasm", "--locked"]
+
+[dependencies]
+near-sdk = { workspace = true }
+hex = { workspace = true }
+nearportal-common = { workspace = true }
+
+[dev-dependencies]
+near-sdk = { workspace = true, features = ["unit-testing"] }
+k256 = { workspace = true }
+bs58 = { workspace = true }
