@@ -1,0 +1,62 @@
+{
+  "source": "approved-logo-concept.png",
+  "method": "Actual RGB pixels; 0-based coordinates; no interpolation or invented tints. Chromatic samples restricted to symbol region.",
+  "colors": {
+    "midnight": {
+      "hex": "#241933",
+      "pixel": [
+        369,
+        108
+      ]
+    },
+    "paper": {
+      "hex": "#FFF7FF",
+      "pixel": [
+        366,
+        903
+      ]
+    },
+    "violet": {
+      "hex": "#A07AEB",
+      "pixel": [
+        536,
+        155
+      ]
+    },
+    "deep-violet": {
+      "hex": "#6E4FB4",
+      "pixel": [
+        541,
+        159
+      ]
+    },
+    "pink": {
+      "hex": "#F081BD",
+      "pixel": [
+        855,
+        131
+      ]
+    },
+    "apricot": {
+      "hex": "#FDA774",
+      "pixel": [
+        382,
+        110
+      ]
+    },
+    "cyan": {
+      "hex": "#62D0CE",
+      "pixel": [
+        545,
+        681
+      ]
+    },
+    "deep-pink": {
+      "hex": "#A33FAC",
+      "pixel": [
+        505,
+        365
+      ]
+    }
+  }
+}

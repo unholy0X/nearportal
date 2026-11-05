@@ -12,6 +12,7 @@
     "build": "node build.mjs",
     "preview": "node server.mjs --production",
     "check": "node --check home.js && node --check workspace-proxy.mjs && node --check funding-progress.mjs && node --check treasury.js && node --check board.js && node --check workspace-model.mjs && node --check workspace-shell.mjs && node --check bounty.js && node --check bounty-detail-model.mjs && node --check journey.mjs && node --check site.mjs && node --check app.js && node --check create.js && node --check bounty-model.mjs && node --check api-proxy.mjs && node --check server.mjs && node --check build.mjs",
+    "test": "node --test test/*.test.mjs",
     "sync:workspace": "node scripts/sync-workspace.mjs"
   }
 }

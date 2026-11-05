@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {deadlineState,duration} from '../deadline.mjs';
+const end=1800000000000;
+const bounty={marketTerms:{kind:'fixed'},market:{deliveryHours:1,assignment:{confirmed:true,deadline:end}}};
+test('countdown has exact hours, minutes, seconds and bounded remaining fraction',()=>{const s=deadlineState(bounty,end-3599000);assert.equal(s.value,'00:59:59');assert.ok(s.progress<1&&s.progress>.99);assert.equal(deadlineState(bounty,end-600000).kind,'urgent');assert.equal(deadlineState(bounty,end-99999999).progress,1);});
+test('end of clock never claims the bounty reopened or paid',()=>{const s=deadlineState(bounty,end);assert.equal(s.kind,'expired');assert.equal(s.value,'00:00:00');assert.equal(s.note,'Awaiting assignment update');});
+test('a timely submission stops the countdown even after the deadline',()=>{const b=structuredClone(bounty);b.market.assignment.submission={receivedAt:end-1};assert.equal(deadlineState(b,end+99999).kind,'submitted');b.market.settlement={processed:true};assert.equal(deadlineState(b,end),null);});
+test('unclaimed and unconfirmed assignments never start a clock',()=>{assert.equal(deadlineState({marketTerms:{kind:'fixed'},market:{deliveryHours:1}},end).value,'1 hour');assert.equal(deadlineState({marketTerms:{kind:'fixed'},market:{assignment:{confirmed:false}}},end).kind,'pending');assert.equal(deadlineState({},end),null);assert.equal(duration(48),'2 days');});
+test('Home read projection and terminal payment states use the same model',()=>{assert.equal(deadlineState({deadlineWindow:bounty.market},end-1000).value,'00:00:01');assert.equal(deadlineState({...bounty,status:{key:'paid'}},end),null);assert.equal(deadlineState({...bounty,task:{payment:{state:'Processed'}}},end),null);});
