@@ -30,3 +30,10 @@
 @keyframes mcp-sheen{0%,65%{left:-85%}90%,100%{left:140%}}
 @media(max-width:640px){.hero>.hero-actions{flex-wrap:wrap}.hero>.hero-actions .mcp-spotlight{flex:0 0 100%;box-shadow:0 0 0 3px color-mix(in srgb,var(--violet) 14%,transparent),0 5px 24px color-mix(in srgb,var(--deep-violet) 24%,transparent)}}
 @media(prefers-reduced-motion:reduce){.button.mcp-spotlight:after{animation:none;display:none}}
+
+/* Keep the landing page repository action prominent at every screen size. */
+.site-header .repository-button{flex:none;min-height:46px;padding:11px 18px;font-size:14px;white-space:nowrap;box-shadow:0 4px 16px color-mix(in srgb,var(--deep-violet) 22%,transparent)}
+.repository-icon{display:block;flex:none}
+@media(max-width:900px){.site-header .repository-button{padding-inline:14px;font-size:13px}}
+@media(max-width:640px){.site-header{gap:12px;padding-inline:16px;flex-wrap:wrap}.site-header .repository-button{min-height:44px;padding:10px 12px;font-size:12px}.repository-icon{width:18px;height:18px}.site-header .brand{gap:8px}.site-header .brand span{font-size:23px}}
+@media(max-width:360px){.site-header .repository-button{width:100%}}
